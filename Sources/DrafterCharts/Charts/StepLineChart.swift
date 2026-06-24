@@ -104,9 +104,11 @@ public struct StepLineChartRenderer: ChartRenderer {
       drawVertexDot(in: &context, center: point, color: data.color, radius: 4)
     }
 
-    // X-axis labels — thinned so they stay legible at small sizes (at most ~6).
+    // X-axis labels — driven by the points (values) and thinned so they stay
+    // legible at small sizes (at most ~6). Each label is bounds-checked, so a
+    // short/long `labels` array can never crash or draw a mismatched label.
     let maxLabels = 6
-    let labelStride = max(1, (data.labels.count + maxLabels - 1) / maxLabels)
+    let labelStride = max(1, (points.count + maxLabels - 1) / maxLabels)
     for (index, point) in points.enumerated() {
       guard index < data.labels.count, index % labelStride == 0 else { continue }
       let text = Text(data.labels[index]).font(.system(size: 9)).foregroundColor(theme.label)

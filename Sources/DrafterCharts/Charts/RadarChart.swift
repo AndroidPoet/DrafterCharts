@@ -22,7 +22,8 @@ public struct RadarChartData: Equatable, Sendable {
 
 /// Draws one or more overlaid `RadarChartData` polygons into a canvas.
 ///
-/// Axes are taken from the first dataset's keys (in insertion order). Each
+/// Axes are taken from the first non-empty dataset's keys, with any extra keys
+/// from later datasets unioned in so no series loses an axis. Each
 /// dataset is filled at 22% and stroked at 90% opacity, both scaled by reveal
 /// `progress`; vertices grow outward from the center as `progress` advances.
 public struct RadarChartRenderer: ChartRenderer {
@@ -35,8 +36,10 @@ public struct RadarChartRenderer: ChartRenderer {
   }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    guard let first = data.first else { return }
-    let axisLabels = Self.orderedKeys(first.values)
+    // Element count is driven by `data`; axes are derived defensively so series
+    // with differing (or empty) key sets can never crash or drop the whole chart.
+    guard !data.isEmpty else { return }
+    let axisLabels = Self.orderedAxisLabels(data)
     let axisCount = axisLabels.count
     guard axisCount >= 3 else { return }
 
@@ -45,7 +48,7 @@ public struct RadarChartRenderer: ChartRenderer {
     drawGridAndAxes(in: &context, layout: layout, axisLabels: axisLabels, theme: theme)
 
     for (index, dataset) in data.enumerated() {
-      let color = colors.isEmpty ? theme.color(at: index) : colors[index % colors.count]
+      let color = colors.indices.contains(index) ? colors[index] : theme.color(at: index)
       drawDataPolygon(
         in: &context,
         layout: layout,
@@ -139,6 +142,23 @@ public struct RadarChartRenderer: ChartRenderer {
   // Keys in insertion order where available, otherwise sorted for stability.
   private static func orderedKeys(_ values: [String: Float]) -> [String] {
     values.keys.sorted()
+  }
+
+  // Stable axis ordering across (possibly mismatched) series. Seeds from the
+  // first non-empty series' sorted keys, then appends any extra keys from other
+  // series (also sorted) so a richer series never silently loses an axis. For
+  // matching input this is identical to sorting the first series' keys.
+  private static func orderedAxisLabels(_ data: [RadarChartData]) -> [String] {
+    guard let seed = data.first(where: { !$0.values.isEmpty }) else { return [] }
+    var labels = orderedKeys(seed.values)
+    var seen = Set(labels)
+    for dataset in data {
+      for key in orderedKeys(dataset.values) where !seen.contains(key) {
+        labels.append(key)
+        seen.insert(key)
+      }
+    }
+    return labels
   }
 }
 

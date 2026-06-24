@@ -50,7 +50,7 @@ https://github.com/AndroidPoet/DrafterCharts.git
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/AndroidPoet/DrafterCharts.git", from: "1.1.0")
+  .package(url: "https://github.com/AndroidPoet/DrafterCharts.git", from: "1.2.0")
 ],
 targets: [
   .target(name: "MyApp", dependencies: [
@@ -221,16 +221,39 @@ Histogram(
 
 ## Waterfall Chart
 
+`values` are the incremental changes applied to `initialValue`; the number of
+bars is driven by `values` (one label per delta), so the counts always line up.
+
 ```swift
 WaterfallChart(
   data: WaterfallChartData(
-    labels: ["Start", "Revenue", "Cost", "Profit"],
-    values: [50, -20, 30],   // changes from the initial value
+    labels: ["Revenue", "Cost", "Profit"],  // one label per delta
+    values: [50, -20, 30],                   // changes from the initial value
     initialValue: 100
   )
 )
 .frame(height: 300)
 ```
+
+Opt into a leading **Start** bar (the initial value) and a trailing **Total**
+bar (the final running total) — the classic Start … Total waterfall:
+
+```swift
+WaterfallChart(
+  data: WaterfallChartData(
+    labels: ["Start", "Sales", "Costs", "Tax", "Net"],
+    values: [60, -25, -10],          // 3 deltas → Start + 3 + Net = 5 bars
+    initialValue: 50,
+    showInitialBar: true,            // draws "Start" at the initial value
+    showTotalBar: true               // draws "Net" at the final total
+  )
+)
+.frame(height: 300)
+```
+
+> Counts don't have to be perfect: every chart drives its element count from the
+> value arrays, and mismatched `labels`/`colors` are handled gracefully (missing
+> entries fall back, extras are ignored) — no ghost columns or crashes.
 
 ## Area Chart
 

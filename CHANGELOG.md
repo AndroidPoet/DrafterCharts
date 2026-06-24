@@ -4,6 +4,27 @@ All notable changes to DrafterCharts are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-25
+
+### Added
+- `WaterfallChart` can now render a leading **Start** bar (the initial value) and
+  a trailing **Total** bar (the final running total) via `showInitialBar` /
+  `showTotalBar` — the classic Start … Total waterfall. Connectors between steps
+  are now horizontal at each running total.
+
+### Fixed / Hardened
+- Every chart now drives its element/column count from its **value arrays**, never
+  from `labels` or `colors`. Mismatched parallel arrays can no longer create ghost
+  columns, drop series, recycle the wrong colors, or crash:
+  - bar family (simple/grouped/stacked/waterfall) pads or truncates labels to the
+    data count;
+  - line family (simple/grouped/stacked) drives vertices and series from the value
+    rows and guards ragged inner rows;
+  - area, step-line, radar, scatter, stream graph, and gantt bounds-check every
+    label, color, and dictionary access with a theme-color fallback.
+- Added a `MismatchSafetyTests` suite that feeds deliberately-malformed data to
+  every at-risk chart and asserts it renders without ghosts or crashes.
+
 ## [1.1.0] - 2026-06-24
 
 ### Added
@@ -39,5 +60,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Catmull-Rom smoothing, gradient fills, left-to-right reveal animations, and
   light/dark theming via `DrafterThemeColors`.
 
+[1.2.0]: https://github.com/AndroidPoet/DrafterCharts/releases/tag/1.2.0
 [1.1.0]: https://github.com/AndroidPoet/DrafterCharts/releases/tag/1.1.0
 [1.0.0]: https://github.com/AndroidPoet/DrafterCharts/releases/tag/1.0.0

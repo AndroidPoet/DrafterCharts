@@ -59,6 +59,15 @@ private protocol BarVariant {
   )
 }
 
+/// Pads or truncates `labels` to exactly `count` entries, so a mismatched label
+/// array can never drive a different number of columns than the data. Missing
+/// labels become empty strings; extra labels are dropped.
+func normalizedLabels(_ labels: [String], count: Int) -> [String] {
+  guard count > 0 else { return [] }
+  if labels.count == count { return labels }
+  return (0..<count).map { $0 < labels.count ? labels[$0] : "" }
+}
+
 /// Draws a rounded-top bar with a soft top-to-bottom gradient (the premium
 /// look from the Compose simple-bar renderer), used by every variant for
 /// visual consistency.
@@ -188,7 +197,7 @@ public struct SimpleBarChartRenderer: ChartRenderer {
   private struct Variant: BarVariant {
     let data: SimpleBarChartData
     let theme: DrafterThemeColors
-    var labels: [String] { data.labels }
+    var labels: [String] { normalizedLabels(data.labels, count: data.values.count) }
     var barsPerGroup: Int { 1 }
     func maxValue() -> Float { data.values.max() ?? 0 }
 
@@ -271,7 +280,7 @@ public struct GroupedBarChartRenderer: ChartRenderer {
     let data: GroupedBarChartData
     let theme: DrafterThemeColors
     private static let innerSpacing: CGFloat = 4
-    var labels: [String] { data.labels }
+    var labels: [String] { normalizedLabels(data.labels, count: data.groupedValues.count) }
     var barsPerGroup: Int { max(data.itemNames.count, 1) }
     func maxValue() -> Float { data.groupedValues.flatMap { $0 }.max() ?? 0 }
 
@@ -352,7 +361,7 @@ public struct StackedBarChartRenderer: ChartRenderer {
     let theme: DrafterThemeColors
     // Numeric labels are formatted to one decimal, matching the Compose renderer.
     var labels: [String] {
-      data.labels.map { label in
+      normalizedLabels(data.labels, count: data.stacks.count).map { label in
         if let f = Float(label) { return ChartFormatting.format(f, decimals: 1) }
         return label
       }
@@ -517,54 +526,95 @@ public struct Histogram: View {
 
 // MARK: - Waterfall
 
-/// Data for a `WaterfallChart`: incremental `values` from an `initialValue`.
+/// Data for a `WaterfallChart`: incremental `values` applied to an
+/// `initialValue`, optionally bookended by a leading "Start" bar (the initial
+/// value) and a trailing "Total" bar (the final running total).
+///
+/// The number of rendered bars is driven by `values` (plus the optional Start /
+/// Total bars), never by `labels` — so passing too many or too few labels can
+/// never create ghost columns. Labels are matched to bars by position; missing
+/// labels render blank and extra labels are ignored.
 public struct WaterfallChartData: Equatable, Sendable {
   public var labels: [String]
   public var values: [Float]
   public var colors: [Color]
   public var initialValue: Float
+  /// Draws the `initialValue` as a leading full bar (labeled by the first label).
+  public var showInitialBar: Bool
+  /// Draws the final running total as a trailing full bar (labeled by the last label).
+  public var showTotalBar: Bool
 
-  public init(labels: [String], values: [Float], colors: [Color] = DrafterColors.palette, initialValue: Float = 0) {
+  public init(
+    labels: [String],
+    values: [Float],
+    colors: [Color] = DrafterColors.palette,
+    initialValue: Float = 0,
+    showInitialBar: Bool = false,
+    showTotalBar: Bool = false
+  ) {
     self.labels = labels
     self.values = values
     self.colors = colors
     self.initialValue = initialValue
+    self.showInitialBar = showInitialBar
+    self.showTotalBar = showTotalBar
   }
 }
 
-/// Draws a `WaterfallChartData`: each bar spans the running total's change,
-/// with connector lines between steps.
+/// Draws a `WaterfallChartData`: each bar spans the running total's change, with
+/// horizontal connectors between steps. Optional Start / Total bars rise from
+/// the baseline.
 public struct WaterfallChartRenderer: ChartRenderer {
   public let data: WaterfallChartData
   public init(data: WaterfallChartData) { self.data = data }
 
-  /// Running totals: `[initial, initial+v0, initial+v0+v1, ...]`.
-  private func cumulative() -> [Float] {
-    var result: [Float] = [data.initialValue]
-    var sum = data.initialValue
+  /// One rendered column: a bar spanning `[start, end]` in value space.
+  private struct Step: Equatable {
+    let start: Float
+    let end: Float
+  }
+
+  /// Builds the ordered columns: optional Start bar, one bar per delta, optional
+  /// Total bar. This count — not `labels.count` — drives the chart.
+  private func buildSteps() -> [Step] {
+    var result: [Step] = []
+    if data.showInitialBar {
+      result.append(Step(start: 0, end: data.initialValue))
+    }
+    var running = data.initialValue
     for value in data.values {
-      sum += value
-      result.append(sum)
+      let start = running
+      running += value
+      result.append(Step(start: start, end: running))
+    }
+    if data.showTotalBar {
+      result.append(Step(start: 0, end: running))
     }
     return result
   }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
+    let steps = buildSteps()
+    guard !steps.isEmpty else { return }
     drawBarChart(
-      Variant(data: data, cumulative: cumulative(), theme: theme),
+      Variant(
+        steps: steps,
+        labels: normalizedLabels(data.labels, count: steps.count),
+        colors: data.colors,
+        theme: theme
+      ),
       in: &context, size: size, theme: theme, progress: progress
     )
   }
 
   private struct Variant: BarVariant {
-    let data: WaterfallChartData
-    let cumulative: [Float]
+    let steps: [Step]
+    let labels: [String]
+    let colors: [Color]
     let theme: DrafterThemeColors
-    var labels: [String] { data.labels }
     var barsPerGroup: Int { 1 }
     func maxValue() -> Float {
-      let absValues = cumulative.map { abs($0) }
-      return absValues.max() ?? 0
+      steps.flatMap { [abs($0.start), abs($0.end)] }.max() ?? 0
     }
 
     func barAndSpacing(chartWidth: CGFloat, dataSize: Int, barsPerGroup: Int) -> (CGFloat, CGFloat) {
@@ -582,24 +632,23 @@ public struct WaterfallChartRenderer: ChartRenderer {
       in context: inout GraphicsContext, index: Int, left: CGFloat, barWidth: CGFloat,
       groupSpacing: CGFloat, chartBottom: CGFloat, chartHeight: CGFloat, maxValue: Float, progress: Double
     ) {
-      guard index < data.values.count, index + 1 < cumulative.count else { return }
-      let startValue = cumulative[index]
-      let endValue = cumulative[index + 1]
-      let yStart = chartBottom - CGFloat(startValue / maxValue) * chartHeight
-      let yEnd = chartBottom - CGFloat(endValue / maxValue) * chartHeight
+      guard index < steps.count, maxValue > 0 else { return }
+      let step = steps[index]
+      let yStart = chartBottom - CGFloat(step.start / maxValue) * chartHeight
+      let yEnd = chartBottom - CGFloat(step.end / maxValue) * chartHeight
       let top = min(yStart, yEnd)
       let height = abs(yEnd - yStart) * CGFloat(progress)
-      let color = data.colors.indices.contains(index) ? data.colors[index] : theme.color(at: index)
+      let color = colors.indices.contains(index) ? colors[index] : theme.color(at: index)
       let rect = CGRect(x: left, y: top, width: barWidth, height: height)
       drawBar(in: &context, rect: rect, color: color, cornerRadius: barWidth * 0.2)
 
-      // Connector from the previous bar's end to this bar's start.
+      // Horizontal connector at the previous column's running total.
       if index > 0 {
-        let previousY = chartBottom - CGFloat(cumulative[index] / maxValue) * chartHeight
+        let prevY = chartBottom - CGFloat(steps[index - 1].end / maxValue) * chartHeight
         var line = Path()
-        line.move(to: CGPoint(x: left - barWidth - groupSpacing, y: previousY))
-        line.addLine(to: CGPoint(x: left, y: yStart))
-        context.stroke(line, with: .color(theme.label), lineWidth: 2)
+        line.move(to: CGPoint(x: left - groupSpacing, y: prevY))
+        line.addLine(to: CGPoint(x: left, y: prevY))
+        context.stroke(line, with: .color(theme.label.opacity(0.55)), lineWidth: 1.5)
       }
     }
   }

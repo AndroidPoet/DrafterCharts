@@ -12,7 +12,7 @@
 import SwiftUI
 
 /// Data for a `ScatterPlot`: cartesian `points` (x, y) and a parallel list of
-/// `pointColors` cycled per point (falls back to gray when a color is missing).
+/// `pointColors` indexed per point (falls back to the theme palette when a color is missing).
 public struct ScatterPlotData: Equatable, Sendable {
   public var points: [Point]
   public var pointColors: [Color]
@@ -94,7 +94,9 @@ public struct ScatterPlotRenderer: ChartRenderer {
       let y = chartTop + chartHeight - (CGFloat(point.y) / maxY) * chartHeight
       let center = CGPoint(x: x, y: y)
 
-      let color = index < data.pointColors.count ? data.pointColors[index] : .gray
+      // Point count is driven by `points`; color is bounds-checked against the
+      // parallel `pointColors`, falling back to the theme palette when missing.
+      let color = data.pointColors.indices.contains(index) ? data.pointColors[index] : theme.color(at: index)
 
       // Soft translucent halo.
       context.fill(circlePath(center: center, radius: pointSize * 2), with: .color(color.opacity(0.16 * Double(p))))

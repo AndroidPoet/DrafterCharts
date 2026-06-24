@@ -81,12 +81,14 @@ public struct AreaChartRenderer: ChartRenderer {
       drawVertexDot(in: &context, center: point, color: data.color, radius: 4)
     }
 
-    // X labels — thinned so they stay legible at small sizes (at most ~6).
+    // X labels — driven by the points (values), thinned so they stay legible at
+    // small sizes (at most ~6). A label is only drawn when one exists at that
+    // index, so a short/long `labels` array can never crash or shift labels.
     let maxLabels = 6
-    let labelStride = max(1, (data.labels.count + maxLabels - 1) / maxLabels)
-    for (index, label) in data.labels.enumerated()
-    where index < points.count && index % labelStride == 0 {
-      let text = Text(label).font(.system(size: 9)).foregroundColor(theme.label)
+    let labelStride = max(1, (points.count + maxLabels - 1) / maxLabels)
+    for index in points.indices
+    where index < data.labels.count && index % labelStride == 0 {
+      let text = Text(data.labels[index]).font(.system(size: 9)).foregroundColor(theme.label)
       context.draw(text, at: CGPoint(x: points[index].x, y: bounds.bottom + 13), anchor: .center)
     }
   }

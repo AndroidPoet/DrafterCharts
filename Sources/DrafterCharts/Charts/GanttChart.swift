@@ -83,7 +83,9 @@ public struct GanttChartRenderer: ChartRenderer {
       let startX = chartLeft + (CGFloat(task.startMonth) / safeMaxMonth) * chartWidth
       let width = max((CGFloat(task.duration) / safeMaxMonth) * chartWidth * p, 1)
       let y = chartTop + CGFloat(index) * taskHeight
-      let color = index < data.taskColors.count ? data.taskColors[index] : DrafterColors.blue
+      // Bars are driven by `tasks`; a shorter/longer `taskColors` can never add or
+      // drop a bar. Bounds-check the color and fall back to the theme palette.
+      let color = data.taskColors.indices.contains(index) ? data.taskColors[index] : theme.color(at: index)
       let barHeight = max(taskHeight * 0.8, 1)
       let rect = CGRect(x: startX, y: y + taskHeight * 0.1, width: width, height: barHeight)
       let bar = Path(roundedRect: rect, cornerRadius: min(6, barHeight / 2))

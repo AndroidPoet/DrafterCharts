@@ -46,10 +46,12 @@ public struct StreamGraphChartRenderer: ChartRenderer {
   public let data: StreamData
   public init(data: StreamData) { self.data = data }
 
-  /// Number of x points shared by every series.
+  /// Number of x points shared by every series. Driven by the series' own value
+  /// arrays — the common minimum length across all series so the stack only
+  /// samples indices that every series actually has — never by `labels.count`.
+  /// Ragged or over-long label arrays can't introduce phantom samples this way.
   private var pointCount: Int {
-    let minSeries = data.series.map { $0.values.count }.min() ?? 0
-    return max(data.labels.count, minSeries)
+    data.series.map { $0.values.count }.min() ?? 0
   }
 
   /// The largest total stacked value across all x points (drives the y scale).

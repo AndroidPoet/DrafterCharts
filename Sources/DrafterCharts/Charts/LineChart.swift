@@ -49,10 +49,14 @@ private func lineGridStep(_ maxValue: Double) -> Double {
 private func drawLineChrome(
   in context: inout GraphicsContext,
   bounds: ChartBounds,
-  labels: [String],
+  labels rawLabels: [String],
+  pointCount: Int,
   maxValue: Double,
   theme: DrafterThemeColors
 ) {
+  // Pad/truncate labels to the number of plotted x-points so the x-axis labels
+  // line up with the vertices even when the caller passes a mismatched count.
+  let labels = normalizedLabels(rawLabels, count: pointCount)
   // Y grid + value labels: one line per "nice" step up to maxValue.
   if maxValue > 0 {
     let step = lineGridStep(maxValue)
@@ -111,7 +115,7 @@ public struct LineChartRenderer: ChartRenderer {
     let maxValue = Double(values.max() ?? 0)
     let bounds = lineBounds(size)
 
-    drawLineChrome(in: &context, bounds: bounds, labels: data.labels, maxValue: maxValue, theme: theme)
+    drawLineChrome(in: &context, bounds: bounds, labels: data.labels, pointCount: values.count, maxValue: maxValue, theme: theme)
 
     guard values.count >= 2, maxValue > 0 else { return }
 
@@ -162,10 +166,16 @@ public struct GroupedLineChartRenderer: ChartRenderer {
     let maxValue = Double(data.groupedValues.flatMap { $0 }.max() ?? 0)
     let bounds = lineBounds(size)
 
-    drawLineChrome(in: &context, bounds: bounds, labels: data.labels, maxValue: maxValue, theme: theme)
+    // x-points are driven by the value rows (one per x-index), never by labels.
+    let numPoints = data.groupedValues.count
+    drawLineChrome(in: &context, bounds: bounds, labels: data.labels, pointCount: numPoints, maxValue: maxValue, theme: theme)
 
-    let numPoints = data.labels.count
     guard numPoints >= 2, maxValue > 0 else { return }
+
+    // Series count is the inner dimension of the value rows (widest row), so a
+    // short/long `itemNames` or `colors` array can't add or drop series.
+    let seriesCount = data.groupedValues.map(\.count).max() ?? 0
+    guard seriesCount > 0 else { return }
 
     let xPositions: [CGFloat] = (0..<numPoints).map { index in
       bounds.left + CGFloat(index) * (bounds.width / CGFloat(numPoints - 1))
@@ -174,10 +184,11 @@ public struct GroupedLineChartRenderer: ChartRenderer {
     let span = (xPositions.last ?? 0) - (xPositions.first ?? 0)
     let revealRight = (xPositions.first ?? 0) + span * clamped
 
-    for itemIndex in data.itemNames.indices {
-      let color = itemIndex < data.colors.count ? data.colors[itemIndex] : .gray
+    for itemIndex in 0..<seriesCount {
+      let color = data.colors.indices.contains(itemIndex) ? data.colors[itemIndex] : theme.color(at: itemIndex)
       let points: [CGPoint] = (0..<numPoints).map { index in
-        let value = itemIndex < data.groupedValues[index].count ? data.groupedValues[index][itemIndex] : 0
+        let row = data.groupedValues[index]
+        let value = row.indices.contains(itemIndex) ? row[itemIndex] : 0
         let y = bounds.bottom - CGFloat(Double(value) / maxValue) * bounds.height
         return CGPoint(x: xPositions[index], y: y)
       }
@@ -226,29 +237,33 @@ public struct StackedLineChartRenderer: ChartRenderer {
     let maxValue = Double(data.stacks.map { $0.reduce(0, +) }.max() ?? 0)
     let bounds = lineBounds(size)
 
-    drawLineChrome(in: &context, bounds: bounds, labels: data.labels, maxValue: maxValue, theme: theme)
+    // x-points are driven by the value rows (one per x-index), never by labels.
+    let numPoints = data.stacks.count
+    drawLineChrome(in: &context, bounds: bounds, labels: data.labels, pointCount: numPoints, maxValue: maxValue, theme: theme)
 
-    let numPoints = data.labels.count
-    guard numPoints >= 2, maxValue > 0, let first = data.stacks.first, !first.isEmpty else { return }
+    guard numPoints >= 2, maxValue > 0 else { return }
     let baseline = bounds.bottom
-    let stackCount = first.count
+    // Level count is the widest row so a ragged short row can't drop a band.
+    let stackCount = data.stacks.map(\.count).max() ?? 0
+    guard stackCount > 0 else { return }
 
     let xPositions: [CGFloat] = (0..<numPoints).map { index in
       bounds.left + CGFloat(index) * (bounds.width / CGFloat(numPoints - 1))
     }
 
-    // cumulative[k][i] = sum of stacks[i][0...k].
+    // cumulative[k][i] = sum of stacks[i][0...k]; ragged rows are guarded per access.
     let cumulative: [[Float]] = (0..<stackCount).map { k in
       (0..<numPoints).map { i in
+        let row = data.stacks[i]
         var sum: Float = 0
-        for s in 0...k where s < data.stacks[i].count { sum += data.stacks[i][s] }
+        for s in 0...k where row.indices.contains(s) { sum += row[s] }
         return sum
       }
     }
 
     // Back-to-front: top stack first so each band shows above the one below.
     for stackIndex in stride(from: stackCount - 1, through: 0, by: -1) {
-      let color = stackIndex < data.colors.count ? data.colors[stackIndex] : .gray
+      let color = data.colors.indices.contains(stackIndex) ? data.colors[stackIndex] : theme.color(at: stackIndex)
       let topPoints: [CGPoint] = (0..<numPoints).map { i in
         let ratio = (Double(cumulative[stackIndex][i]) * progress) / maxValue
         let y = baseline - CGFloat(ratio) * bounds.height

@@ -117,8 +117,10 @@ struct ContentView: View {
         WaterfallChart(
           data: WaterfallChartData(
             labels: ["Start", "Sales", "Costs", "Tax", "Net"],
-            values: [0, 60, -25, -10, 0],
-            initialValue: 50
+            values: [60, -25, -10],
+            initialValue: 50,
+            showInitialBar: true,
+            showTotalBar: true
           ),
           replay: replay
         )
