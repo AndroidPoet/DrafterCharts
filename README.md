@@ -15,6 +15,12 @@
 </p>
 </div>
 
+<div align="center">
+
+https://github.com/AndroidPoet/DrafterCharts/raw/main/Art/demo.mp4
+
+</div>
+
 ## Features
 
 - 📊 **27 chart types** out of the box:
