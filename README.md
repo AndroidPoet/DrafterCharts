@@ -52,7 +52,7 @@ https://github.com/AndroidPoet/DrafterCharts.git
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/AndroidPoet/DrafterCharts.git", from: "1.2.0")
+  .package(url: "https://github.com/AndroidPoet/DrafterCharts.git", from: "0.1.0")
 ],
 targets: [
   .target(name: "MyApp", dependencies: [
@@ -73,9 +73,9 @@ Every chart is a SwiftUI `View` that takes a value-type data model. Two optional
 | `replay`  | `0`     | Change this value (e.g. from a button) to replay the entrance animation. |
 
 ```swift
-AreaChart(data: areaData)              // animates on appear
-AreaChart(data: areaData, animate: false)   // static
-AreaChart(data: areaData, replay: replayKey)  // bump replayKey to re-run
+AreaChart(points: areaPoints)              // animates on appear
+AreaChart(points: areaPoints, animate: false)   // static
+AreaChart(points: areaPoints, replay: replayKey)  // bump replayKey to re-run
 ```
 
 Size charts like any SwiftUI view with `.frame(...)`, and set the palette/light-dark with `.drafterTheme(...)`.
@@ -89,7 +89,7 @@ SimpleBarChart(values: [24, 38, 30, 46])
 StepLineChart(values: [10, 25, 18, 32])
 ```
 
-The full `init(data:)` form remains the primary API for labels, multi-series, and per-element colors.
+The full point/series form (`points:`, `series:`, `bars:`) is the primary API for labels, multi-series, and per-element colors.
 
 ## Table of Contents
 
@@ -122,10 +122,7 @@ The full `init(data:)` form remains the primary API for labels, multi-series, an
 
 ```swift
 SimpleBarChart(
-  data: SimpleBarChartData(
-    labels: ["Jan", "Feb", "Mar", "Apr"],
-    values: [10, 30, 15, 45]
-  )
+  bars: [BarItem("Q1", 24), BarItem("Q2", 38), BarItem("Q3", 30), BarItem("Q4", 46)]
 )
 .frame(height: 300)
 ```
@@ -134,15 +131,11 @@ SimpleBarChart(
 
 ```swift
 GroupedBarChart(
-  data: GroupedBarChartData(
-    labels: ["2020", "2021", "2022"],
-    itemNames: ["Product A", "Product B", "Product C"],
-    groupedValues: [
-      [10, 20, 15],   // 2020
-      [25, 5, 30],    // 2021
-      [12, 28, 10],   // 2022
-    ]
-  )
+  series: [
+    ChartSeries(name: "2023", color: DrafterColors.blue, values: [20, 34, 26, 40]),
+    ChartSeries(name: "2024", color: DrafterColors.teal, values: [28, 30, 38, 44]),
+  ],
+  categories: ["Q1", "Q2", "Q3", "Q4"]
 )
 .frame(height: 300)
 ```
@@ -151,14 +144,12 @@ GroupedBarChart(
 
 ```swift
 StackedBarChart(
-  data: StackedBarChartData(
-    labels: ["Q1", "Q2", "Q3"],
-    stacks: [
-      [10, 15, 5],    // Q1
-      [8, 12, 20],    // Q2
-      [18, 10, 15],   // Q3
-    ]
-  )
+  series: [
+    ChartSeries(color: DrafterColors.blue,   values: [12, 16, 14, 20]),
+    ChartSeries(color: DrafterColors.teal,   values: [8, 10, 12, 14]),
+    ChartSeries(color: DrafterColors.violet, values: [6, 8, 10, 9]),
+  ],
+  categories: ["Q1", "Q2", "Q3", "Q4"]
 )
 .frame(height: 300)
 ```
@@ -169,10 +160,8 @@ StackedBarChart(
 
 ```swift
 LineChart(
-  data: SimpleLineChartData(
-    labels: ["A", "B", "C", "D"],
-    values: [10, 20, 15, 25]
-  )
+  points: [ChartPoint("Jan", 40), ChartPoint("Feb", 65), ChartPoint("Mar", 50), ChartPoint("Apr", 80)],
+  color: .blue
 )
 .frame(height: 300)
 ```
@@ -181,14 +170,11 @@ LineChart(
 
 ```swift
 GroupedLineChart(
-  data: GroupedLineChartData(
-    labels: ["Q1", "Q2", "Q3", "Q4"],
-    itemNames: ["Product A", "Product B"],
-    groupedValues: [
-      [10, 15], [20, 25], [15, 10], [25, 20],
-    ],
-    colors: DrafterColors.palette
-  )
+  series: [
+    ChartSeries(name: "A", color: DrafterColors.blue, values: [30, 45, 40, 70]),
+    ChartSeries(name: "B", color: DrafterColors.teal, values: [20, 35, 50, 45]),
+  ],
+  categories: ["Jan", "Feb", "Mar", "Apr"]
 )
 .frame(height: 300)
 ```
@@ -197,13 +183,11 @@ GroupedLineChart(
 
 ```swift
 StackedLineChart(
-  data: StackedLineChartData(
-    labels: ["Jan", "Feb", "Mar", "Apr"],
-    stacks: [
-      [5, 5, 2], [7, 3, 4], [6, 4, 3], [8, 2, 5],
-    ],
-    colors: DrafterColors.palette
-  )
+  series: [
+    ChartSeries(color: DrafterColors.violet, values: [10, 14, 12, 20]),
+    ChartSeries(color: DrafterColors.green,  values: [8, 10, 14, 12]),
+  ],
+  categories: ["Jan", "Feb", "Mar", "Apr"]
 )
 .frame(height: 300)
 ```
@@ -212,27 +196,22 @@ StackedLineChart(
 
 ```swift
 Histogram(
-  data: HistogramData(
-    dataPoints: [1, 2, 2, 3, 3, 3, 4, 4, 5, 5, 5, 5],
-    binCount: 5,
-    color: DrafterColors.blue
-  )
+  values: [2, 3, 3, 4, 5, 5, 6, 7, 8, 9, 10, 12, 13, 15],
+  binCount: 5
 )
 .frame(height: 300)
 ```
 
 ## Waterfall Chart
 
-`values` are the incremental changes applied to `initialValue`; the number of
-bars is driven by `values` (one label per delta), so the counts always line up.
+Each `WaterfallStep` is an incremental change applied to `initialValue`; the
+number of bars is driven by `steps` (one step per delta), so the counts always
+line up.
 
 ```swift
 WaterfallChart(
-  data: WaterfallChartData(
-    labels: ["Revenue", "Cost", "Profit"],  // one label per delta
-    values: [50, -20, 30],                   // changes from the initial value
-    initialValue: 100
-  )
+  steps: [WaterfallStep("Revenue", 50), WaterfallStep("Cost", -20), WaterfallStep("Profit", 30)],
+  initialValue: 100
 )
 .frame(height: 300)
 ```
@@ -242,13 +221,10 @@ bar (the final running total) — the classic Start … Total waterfall:
 
 ```swift
 WaterfallChart(
-  data: WaterfallChartData(
-    labels: ["Start", "Sales", "Costs", "Tax", "Net"],
-    values: [60, -25, -10],          // 3 deltas → Start + 3 + Net = 5 bars
-    initialValue: 50,
-    showInitialBar: true,            // draws "Start" at the initial value
-    showTotalBar: true               // draws "Net" at the final total
-  )
+  steps: [WaterfallStep("Sales", 60), WaterfallStep("Costs", -25), WaterfallStep("Tax", -10)],
+  initialValue: 50,
+  startLabel: "Start",   // draws a leading bar at the initial value
+  totalLabel: "Net"      // draws a trailing bar at the final running total
 )
 .frame(height: 300)
 ```
@@ -261,11 +237,11 @@ WaterfallChart(
 
 ```swift
 AreaChart(
-  data: AreaChartData(
-    labels: ["A", "B", "C", "D", "E", "F"],
-    values: [12, 28, 18, 34, 24, 40],
-    color: DrafterColors.blue
-  )
+  points: [
+    ChartPoint("Jan", 12), ChartPoint("Feb", 28), ChartPoint("Mar", 18),
+    ChartPoint("Apr", 34), ChartPoint("May", 24), ChartPoint("Jun", 40),
+  ],
+  color: DrafterColors.blue
 )
 .frame(height: 300)
 ```
@@ -274,11 +250,10 @@ AreaChart(
 
 ```swift
 StepLineChart(
-  data: StepLineChartData(
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-    values: [20, 35, 30, 45, 38],
-    color: DrafterColors.teal
-  )
+  points: [
+    ChartPoint("Jan", 10), ChartPoint("Feb", 25),
+    ChartPoint("Mar", 18), ChartPoint("Apr", 32),
+  ]
 )
 .frame(height: 300)
 ```
@@ -301,10 +276,11 @@ DonutChart(data: pie).frame(width: 240, height: 240)
 
 ```swift
 ScatterPlot(
-  data: ScatterPlotData(
-    points: [(8, 12), (15, 30), (22, 18), (33, 41), (40, 25), (48, 38)],
-    pointColors: DrafterColors.palette
-  )
+  points: [
+    ScatterPoint(x: 1, y: 2),
+    ScatterPoint(x: 2, y: 5),
+    ScatterPoint(x: 3, y: 3, color: DrafterColors.coral),
+  ]
 )
 .frame(height: 300)
 ```
@@ -357,11 +333,9 @@ BoxPlotChart(
 
 ```swift
 RadarChart(
-  data: [
-    RadarChartData(values: [
-      "Execution": 0.8, "Landing": 0.6, "Difficulty": 0.9,
-      "Style": 0.7, "Creativity": 0.85,
-    ])
+  series: [
+    RadarSeries(color: DrafterColors.blue, values: ["Speed": 0.8, "Power": 0.6, "Range": 0.9]),
+    RadarSeries(color: DrafterColors.teal, values: ["Speed": 0.5, "Power": 0.9, "Range": 0.6]),
   ]
 )
 .frame(width: 300, height: 300)
@@ -476,14 +450,11 @@ SankeyChart(
 
 ```swift
 StreamGraphChart(
-  data: StreamData(
-    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-    series: [
-      StreamSeries(name: "A", values: [10, 14, 12, 18, 16, 22], color: DrafterColors.blue),
-      StreamSeries(name: "B", values: [8, 10, 16, 12, 18, 14],  color: DrafterColors.teal),
-      StreamSeries(name: "C", values: [6, 9, 8, 14, 11, 16],    color: DrafterColors.violet),
-    ]
-  )
+  series: [
+    ChartSeries(name: "A", color: DrafterColors.blue, values: [4, 6, 8, 7, 9, 6]),
+    ChartSeries(name: "B", color: DrafterColors.teal, values: [3, 4, 6, 8, 7, 9]),
+  ],
+  categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
 )
 .frame(height: 300)
 ```
@@ -492,13 +463,10 @@ StreamGraphChart(
 
 ```swift
 GanttChart(
-  data: GanttChartData(tasks: [
-    GanttTask(name: "Planning",    startMonth: 0, duration: 2),
-    GanttTask(name: "Design",      startMonth: 2, duration: 2),
-    GanttTask(name: "Development", startMonth: 4, duration: 3),
-    GanttTask(name: "Testing",     startMonth: 7, duration: 2),
-    GanttTask(name: "Deployment",  startMonth: 9, duration: 1),
-  ])
+  tasks: [
+    GanttTask(name: "Design", startMonth: 0, duration: 2, color: DrafterColors.blue),
+    GanttTask(name: "Build",  startMonth: 2, duration: 3, color: DrafterColors.teal),
+  ]
 )
 .frame(height: 300)
 ```
@@ -523,7 +491,7 @@ All charts read their palette and light/dark colors from a `DrafterThemeColors` 
 
 ```swift
 VStack {
-  AreaChart(data: areaData)
+  AreaChart(points: areaPoints)
   PieChart(data: pieData)
 }
 .drafterTheme(.dark)   // or .light, or a custom set:

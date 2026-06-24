@@ -11,8 +11,9 @@
 //    • Stacked — cumulative filled bands drawn back-to-front with smooth
 //                curves and soft gradients that grow vertically on reveal.
 //
-//  Each variant has an immutable data struct, a pure `ChartRenderer`, and a
-//  thin view hosting it in `ChartCanvas`. Mirrors `AreaChart.swift`.
+//  Single series take `[ChartPoint]` (label bound to value); multi-series take
+//  `[ChartSeries]` (color bound to the series) plus optional x-axis `categories`,
+//  so a label or color can never desync from its data. Mirrors `AreaChart.swift`.
 //
 
 import SwiftUI
@@ -49,13 +50,13 @@ private func lineGridStep(_ maxValue: Double) -> Double {
 private func drawLineChrome(
   in context: inout GraphicsContext,
   bounds: ChartBounds,
-  labels rawLabels: [String],
+  categories rawLabels: [String],
   pointCount: Int,
   maxValue: Double,
   theme: DrafterThemeColors
 ) {
-  // Pad/truncate labels to the number of plotted x-points so the x-axis labels
-  // line up with the vertices even when the caller passes a mismatched count.
+  // Pad/truncate categories to the number of plotted x-points so the x-axis
+  // labels line up with the vertices regardless of how many were supplied.
   let labels = normalizedLabels(rawLabels, count: pointCount)
   // Y grid + value labels: one line per "nice" step up to maxValue.
   if maxValue > 0 {
@@ -83,7 +84,7 @@ private func drawLineChrome(
   guard labels.count > 1 else { return }
   let maxLabels = 6
   let labelStride = max(1, (labels.count + maxLabels - 1) / maxLabels)
-  for (index, label) in labels.enumerated() where index % labelStride == 0 {
+  for (index, label) in labels.enumerated() where index % labelStride == 0 && !label.isEmpty {
     let x = bounds.left + CGFloat(index) * (bounds.width / CGFloat(labels.count - 1))
     let text = Text(label).font(.system(size: 9)).foregroundColor(theme.label)
     context.draw(text, at: CGPoint(x: x, y: bounds.bottom + 14), anchor: .center)
@@ -92,34 +93,26 @@ private func drawLineChrome(
 
 // MARK: - Simple
 
-/// Data for a simple single-series line chart: parallel `labels` and `values`.
-public struct SimpleLineChartData: Equatable, Sendable {
-  public var labels: [String]
-  public var values: [Float]
-  public var color: Color
+/// Draws a single smooth series from `[ChartPoint]`: curve, gradient fill, reveal, dots.
+public struct LineChartRenderer: ChartRenderer {
+  public let points: [ChartPoint]
+  public let color: Color
 
-  public init(labels: [String], values: [Float], color: Color = DrafterColors.blue) {
-    self.labels = labels
-    self.values = values
+  public init(points: [ChartPoint], color: Color = DrafterColors.blue) {
+    self.points = points
     self.color = color
   }
-}
-
-/// Draws a `SimpleLineChartData`: smooth curve, gradient fill, reveal, dots.
-public struct LineChartRenderer: ChartRenderer {
-  public let data: SimpleLineChartData
-  public init(data: SimpleLineChartData) { self.data = data }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let values = data.values
+    let values = points.map { $0.value }
     let maxValue = Double(values.max() ?? 0)
     let bounds = lineBounds(size)
 
-    drawLineChrome(in: &context, bounds: bounds, labels: data.labels, pointCount: values.count, maxValue: maxValue, theme: theme)
+    drawLineChrome(in: &context, bounds: bounds, categories: points.map { $0.label }, pointCount: values.count, maxValue: maxValue, theme: theme)
 
     guard values.count >= 2, maxValue > 0 else { return }
 
-    let points: [CGPoint] = values.enumerated().map { index, value in
+    let pixelPoints: [CGPoint] = values.enumerated().map { index, value in
       let x = bounds.left + bounds.width * CGFloat(index) / CGFloat(values.count - 1)
       let y = bounds.bottom - CGFloat(Double(value) / maxValue) * bounds.height
       return CGPoint(x: x, y: y)
@@ -127,8 +120,8 @@ public struct LineChartRenderer: ChartRenderer {
 
     drawSmoothLine(
       in: &context,
-      points: points,
-      color: data.color,
+      points: pixelPoints,
+      color: color,
       baseline: bounds.bottom,
       progress: progress,
       strokeWidth: 6,
@@ -141,41 +134,25 @@ public struct LineChartRenderer: ChartRenderer {
 
 // MARK: - Grouped (overlaid multi-series)
 
-/// Data for overlaid multi-series lines. `groupedValues[i]` holds one value per
-/// item at x-index `i`; `itemNames`/`colors` index across the series.
-public struct GroupedLineChartData: Equatable, Sendable {
-  public var labels: [String]
-  public var itemNames: [String]
-  public var groupedValues: [[Float]]
-  public var colors: [Color]
-
-  public init(labels: [String], itemNames: [String], groupedValues: [[Float]], colors: [Color]) {
-    self.labels = labels
-    self.itemNames = itemNames
-    self.groupedValues = groupedValues
-    self.colors = colors
-  }
-}
-
 /// Draws overlaid smooth series with no fill; vertex dots reveal with the trace.
 public struct GroupedLineChartRenderer: ChartRenderer {
-  public let data: GroupedLineChartData
-  public init(data: GroupedLineChartData) { self.data = data }
+  public let series: [ChartSeries]
+  public let categories: [String]
+
+  public init(series: [ChartSeries], categories: [String] = []) {
+    self.series = series
+    self.categories = categories
+  }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let maxValue = Double(data.groupedValues.flatMap { $0 }.max() ?? 0)
+    let maxValue = Double(series.flatMap { $0.values }.max() ?? 0)
     let bounds = lineBounds(size)
 
-    // x-points are driven by the value rows (one per x-index), never by labels.
-    let numPoints = data.groupedValues.count
-    drawLineChrome(in: &context, bounds: bounds, labels: data.labels, pointCount: numPoints, maxValue: maxValue, theme: theme)
+    // x-points are driven by the series' value arrays (widest series), not labels.
+    let numPoints = series.map { $0.values.count }.max() ?? 0
+    drawLineChrome(in: &context, bounds: bounds, categories: categories, pointCount: numPoints, maxValue: maxValue, theme: theme)
 
-    guard numPoints >= 2, maxValue > 0 else { return }
-
-    // Series count is the inner dimension of the value rows (widest row), so a
-    // short/long `itemNames` or `colors` array can't add or drop series.
-    let seriesCount = data.groupedValues.map(\.count).max() ?? 0
-    guard seriesCount > 0 else { return }
+    guard numPoints >= 2, maxValue > 0, !series.isEmpty else { return }
 
     let xPositions: [CGFloat] = (0..<numPoints).map { index in
       bounds.left + CGFloat(index) * (bounds.width / CGFloat(numPoints - 1))
@@ -184,18 +161,17 @@ public struct GroupedLineChartRenderer: ChartRenderer {
     let span = (xPositions.last ?? 0) - (xPositions.first ?? 0)
     let revealRight = (xPositions.first ?? 0) + span * clamped
 
-    for itemIndex in 0..<seriesCount {
-      let color = data.colors.indices.contains(itemIndex) ? data.colors[itemIndex] : theme.color(at: itemIndex)
-      let points: [CGPoint] = (0..<numPoints).map { index in
-        let row = data.groupedValues[index]
-        let value = row.indices.contains(itemIndex) ? row[itemIndex] : 0
+    for line in series {
+      let color = line.color
+      let pixelPoints: [CGPoint] = (0..<numPoints).map { index in
+        let value = line.values.indices.contains(index) ? line.values[index] : 0
         let y = bounds.bottom - CGFloat(Double(value) / maxValue) * bounds.height
         return CGPoint(x: xPositions[index], y: y)
       }
 
       drawSmoothLine(
         in: &context,
-        points: points,
+        points: pixelPoints,
         color: color,
         baseline: bounds.bottom,
         progress: progress,
@@ -205,7 +181,7 @@ public struct GroupedLineChartRenderer: ChartRenderer {
         smooth: true
       )
 
-      for point in points where point.x <= revealRight + 0.5 {
+      for point in pixelPoints where point.x <= revealRight + 0.5 {
         drawVertexDot(in: &context, center: point, color: color, radius: 5)
       }
     }
@@ -214,56 +190,51 @@ public struct GroupedLineChartRenderer: ChartRenderer {
 
 // MARK: - Stacked (stacked filled areas)
 
-/// Data for stacked filled areas. `stacks[i]` holds each level's value at x-index
-/// `i`; bands are the cumulative sums, drawn back-to-front. `colors` index by level.
-public struct StackedLineChartData: Equatable, Sendable {
-  public var labels: [String]
-  public var stacks: [[Float]]
-  public var colors: [Color]
-
-  public init(labels: [String], stacks: [[Float]], colors: [Color]) {
-    self.labels = labels
-    self.stacks = stacks
-    self.colors = colors
-  }
-}
-
 /// Draws cumulative smooth filled bands that grow vertically with the reveal.
+/// Each `ChartSeries` is one stacked level (bottom-to-top in array order).
 public struct StackedLineChartRenderer: ChartRenderer {
-  public let data: StackedLineChartData
-  public init(data: StackedLineChartData) { self.data = data }
+  public let series: [ChartSeries]
+  public let categories: [String]
+
+  public init(series: [ChartSeries], categories: [String] = []) {
+    self.series = series
+    self.categories = categories
+  }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let maxValue = Double(data.stacks.map { $0.reduce(0, +) }.max() ?? 0)
+    let numPoints = series.map { $0.values.count }.max() ?? 0
+    // Per-x totals across all levels give the max stacked height.
+    let totals: [Float] = (0..<numPoints).map { i in
+      series.reduce(0) { $0 + ($1.values.indices.contains(i) ? $1.values[i] : 0) }
+    }
+    let maxValue = Double(totals.max() ?? 0)
     let bounds = lineBounds(size)
 
-    // x-points are driven by the value rows (one per x-index), never by labels.
-    let numPoints = data.stacks.count
-    drawLineChrome(in: &context, bounds: bounds, labels: data.labels, pointCount: numPoints, maxValue: maxValue, theme: theme)
+    drawLineChrome(in: &context, bounds: bounds, categories: categories, pointCount: numPoints, maxValue: maxValue, theme: theme)
 
-    guard numPoints >= 2, maxValue > 0 else { return }
+    guard numPoints >= 2, maxValue > 0, !series.isEmpty else { return }
     let baseline = bounds.bottom
-    // Level count is the widest row so a ragged short row can't drop a band.
-    let stackCount = data.stacks.map(\.count).max() ?? 0
-    guard stackCount > 0 else { return }
+    let stackCount = series.count
 
     let xPositions: [CGFloat] = (0..<numPoints).map { index in
       bounds.left + CGFloat(index) * (bounds.width / CGFloat(numPoints - 1))
     }
 
-    // cumulative[k][i] = sum of stacks[i][0...k]; ragged rows are guarded per access.
+    // cumulative[k][i] = sum of levels 0...k at x-index i.
     let cumulative: [[Float]] = (0..<stackCount).map { k in
       (0..<numPoints).map { i in
-        let row = data.stacks[i]
         var sum: Float = 0
-        for s in 0...k where row.indices.contains(s) { sum += row[s] }
+        for s in 0...k {
+          let values = series[s].values
+          if values.indices.contains(i) { sum += values[i] }
+        }
         return sum
       }
     }
 
-    // Back-to-front: top stack first so each band shows above the one below.
+    // Back-to-front: top level first so each band shows above the one below.
     for stackIndex in stride(from: stackCount - 1, through: 0, by: -1) {
-      let color = data.colors.indices.contains(stackIndex) ? data.colors[stackIndex] : theme.color(at: stackIndex)
+      let color = series[stackIndex].color
       let topPoints: [CGPoint] = (0..<numPoints).map { i in
         let ratio = (Double(cumulative[stackIndex][i]) * progress) / maxValue
         let y = baseline - CGFloat(ratio) * bounds.height
@@ -302,51 +273,68 @@ public struct StackedLineChartRenderer: ChartRenderer {
 
 /// A smooth single-series line chart with a soft gradient fill and reveal.
 public struct LineChart: View {
-  public let data: SimpleLineChartData
+  public let points: [ChartPoint]
+  public let color: Color
   public var animate: Bool
   public var replay: Int
 
-  public init(data: SimpleLineChartData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(points: [ChartPoint], color: Color = DrafterColors.blue, animate: Bool = true, replay: Int = 0) {
+    self.points = points
+    self.color = color
     self.animate = animate
     self.replay = replay
   }
 
+  /// Convenience for unlabeled data: one value per point, blank x-axis labels.
+  public init(values: [Float], color: Color = DrafterColors.blue, animate: Bool = true, replay: Int = 0) {
+    self.init(points: values.map(ChartPoint.init), color: color, animate: animate, replay: replay)
+  }
+
   public var body: some View {
-    ChartCanvas(renderer: LineChartRenderer(data: data), animate: animate, duration: 1.1, replay: replay)
+    ChartCanvas(renderer: LineChartRenderer(points: points, color: color), animate: animate, duration: 1.1, replay: replay)
   }
 }
 
 /// Overlaid multi-series smooth lines with revealed vertex dots.
 public struct GroupedLineChart: View {
-  public let data: GroupedLineChartData
+  public let series: [ChartSeries]
+  public let categories: [String]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: GroupedLineChartData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(series: [ChartSeries], categories: [String] = [], animate: Bool = true, replay: Int = 0) {
+    self.series = series
+    self.categories = categories
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: GroupedLineChartRenderer(data: data), animate: animate, duration: 1.1, replay: replay)
+    ChartCanvas(
+      renderer: GroupedLineChartRenderer(series: series, categories: categories),
+      animate: animate, duration: 1.1, replay: replay
+    )
   }
 }
 
 /// Stacked filled areas that grow vertically with the reveal.
 public struct StackedLineChart: View {
-  public let data: StackedLineChartData
+  public let series: [ChartSeries]
+  public let categories: [String]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: StackedLineChartData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(series: [ChartSeries], categories: [String] = [], animate: Bool = true, replay: Int = 0) {
+    self.series = series
+    self.categories = categories
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: StackedLineChartRenderer(data: data), animate: animate, duration: 1.1, replay: replay)
+    ChartCanvas(
+      renderer: StackedLineChartRenderer(series: series, categories: categories),
+      animate: animate, duration: 1.1, replay: replay
+    )
   }
 }

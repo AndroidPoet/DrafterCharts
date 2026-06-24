@@ -3,43 +3,32 @@
 //  DrafterCharts
 //
 //  Multi-axis radar (spider) chart: five concentric grid rings, one axis
-//  radiating per dimension, and a filled + stroked polygon per dataset whose
+//  radiating per dimension, and a filled + stroked polygon per series whose
 //  vertices grow from the center as the reveal `progress` advances. Mirrors the
-//  Kotlin `RadarChartRenderer` geometry. Follows the canonical chart pattern: an
-//  immutable data struct, a pure `ChartRenderer`, and a thin hosting view.
+//  Kotlin `RadarChartRenderer` geometry. Follows the canonical chart pattern: a
+//  color-bearing series type, a pure `ChartRenderer`, and a thin hosting view.
 //
 
 import SwiftUI
 
-/// One radar dataset: a dimension-name to normalized-value (0...1) mapping.
-public struct RadarChartData: Equatable, Sendable {
-  public var values: [String: Float]
-
-  public init(values: [String: Float]) {
-    self.values = values
-  }
-}
-
-/// Draws one or more overlaid `RadarChartData` polygons into a canvas.
+/// Draws one or more overlaid `RadarSeries` polygons into a canvas.
 ///
-/// Axes are taken from the first non-empty dataset's keys, with any extra keys
-/// from later datasets unioned in so no series loses an axis. Each
-/// dataset is filled at 22% and stroked at 90% opacity, both scaled by reveal
-/// `progress`; vertices grow outward from the center as `progress` advances.
+/// Axes are taken from the first non-empty series' keys, with any extra keys
+/// from later series unioned in so no series loses an axis. Each series carries
+/// its own `color`, is filled at 22% and stroked at 90% opacity, both scaled by
+/// reveal `progress`; vertices grow outward from the center as `progress` advances.
 public struct RadarChartRenderer: ChartRenderer {
-  public let data: [RadarChartData]
-  public let colors: [Color]
+  public let series: [RadarSeries]
 
-  public init(data: [RadarChartData], colors: [Color] = DrafterColors.palette) {
-    self.data = data
-    self.colors = colors
+  public init(series: [RadarSeries]) {
+    self.series = series
   }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    // Element count is driven by `data`; axes are derived defensively so series
+    // Element count is driven by `series`; axes are derived defensively so series
     // with differing (or empty) key sets can never crash or drop the whole chart.
-    guard !data.isEmpty else { return }
-    let axisLabels = Self.orderedAxisLabels(data)
+    guard !series.isEmpty else { return }
+    let axisLabels = Self.orderedAxisLabels(series)
     let axisCount = axisLabels.count
     guard axisCount >= 3 else { return }
 
@@ -47,14 +36,13 @@ public struct RadarChartRenderer: ChartRenderer {
 
     drawGridAndAxes(in: &context, layout: layout, axisLabels: axisLabels, theme: theme)
 
-    for (index, dataset) in data.enumerated() {
-      let color = colors.indices.contains(index) ? colors[index] : theme.color(at: index)
+    for entry in series {
       drawDataPolygon(
         in: &context,
         layout: layout,
         axisLabels: axisLabels,
-        dataset: dataset,
-        color: color,
+        series: entry,
+        color: entry.color,
         progress: progress
       )
     }
@@ -94,12 +82,12 @@ public struct RadarChartRenderer: ChartRenderer {
     }
   }
 
-  // Filled + stroked polygon for one dataset, vertices scaled by progress.
+  // Filled + stroked polygon for one series, vertices scaled by progress.
   private func drawDataPolygon(
     in context: inout GraphicsContext,
     layout: RadialLayout,
     axisLabels: [String],
-    dataset: RadarChartData,
+    series: RadarSeries,
     color: Color,
     progress: Double
   ) {
@@ -107,7 +95,7 @@ public struct RadarChartRenderer: ChartRenderer {
     let p = CGFloat(min(max(progress, 0), 1))
 
     let points: [CGPoint] = axisLabels.enumerated().map { index, key in
-      let value = CGFloat(dataset.values[key] ?? 0)
+      let value = CGFloat(series.values[key] ?? 0)
       let angle = Self.axisAngle(index: index, count: axisCount)
       let distance = layout.radius * value * p
       return layout.point(angle: angle, distance: distance)
@@ -148,12 +136,12 @@ public struct RadarChartRenderer: ChartRenderer {
   // first non-empty series' sorted keys, then appends any extra keys from other
   // series (also sorted) so a richer series never silently loses an axis. For
   // matching input this is identical to sorting the first series' keys.
-  private static func orderedAxisLabels(_ data: [RadarChartData]) -> [String] {
-    guard let seed = data.first(where: { !$0.values.isEmpty }) else { return [] }
+  private static func orderedAxisLabels(_ series: [RadarSeries]) -> [String] {
+    guard let seed = series.first(where: { !$0.values.isEmpty }) else { return [] }
     var labels = orderedKeys(seed.values)
     var seen = Set(labels)
-    for dataset in data {
-      for key in orderedKeys(dataset.values) where !seen.contains(key) {
+    for entry in series {
+      for key in orderedKeys(entry.values) where !seen.contains(key) {
         labels.append(key)
         seen.insert(key)
       }
@@ -163,28 +151,25 @@ public struct RadarChartRenderer: ChartRenderer {
 }
 
 /// A multi-axis radar chart with grid rings, per-axis labels, and an animated
-/// expand-from-center reveal for each overlaid dataset.
+/// expand-from-center reveal for each overlaid series.
 public struct RadarChart: View {
-  public let data: [RadarChartData]
-  public let colors: [Color]
+  public let series: [RadarSeries]
   public var animate: Bool
   public var replay: Int
 
   public init(
-    data: [RadarChartData],
-    colors: [Color] = DrafterColors.palette,
+    series: [RadarSeries],
     animate: Bool = true,
     replay: Int = 0
   ) {
-    self.data = data
-    self.colors = colors
+    self.series = series
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
     ChartCanvas(
-      renderer: RadarChartRenderer(data: data, colors: colors),
+      renderer: RadarChartRenderer(series: series),
       animate: animate,
       duration: 1.0,
       replay: replay

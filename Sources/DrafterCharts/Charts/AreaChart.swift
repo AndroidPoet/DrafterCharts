@@ -4,33 +4,25 @@
 //
 //  Single smooth-curve area chart: Catmull-Rom spline, soft gradient fill that
 //  fades to the baseline, a left-to-right reveal, and white-haloed vertex dots.
-//  Reference implementation for the chart pattern: an immutable data struct, a
-//  pure `ChartRenderer`, and a thin view that hosts it in `ChartCanvas`.
+//  Reference implementation for the point-based pattern: an array of `ChartPoint`
+//  (label bound to value), a pure `ChartRenderer`, and a thin hosting view.
 //
 
 import SwiftUI
 
-/// Data for an `AreaChart`: parallel `labels` and `values`, plus a line color.
-public struct AreaChartData: Equatable, Sendable {
-  public var labels: [String]
-  public var values: [Float]
-  public var color: Color
+/// Draws a smooth area chart from `[ChartPoint]`.
+public struct AreaChartRenderer: ChartRenderer {
+  public let points: [ChartPoint]
+  public let color: Color
 
-  public init(labels: [String], values: [Float], color: Color = DrafterColors.blue) {
-    self.labels = labels
-    self.values = values
+  public init(points: [ChartPoint], color: Color = DrafterColors.blue) {
+    self.points = points
     self.color = color
   }
-}
-
-/// Draws an `AreaChartData` into a canvas.
-public struct AreaChartRenderer: ChartRenderer {
-  public let data: AreaChartData
-  public init(data: AreaChartData) { self.data = data }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let values = data.values
-    guard values.count >= 2 else { return }
+    guard points.count >= 2 else { return }
+    let values = points.map { $0.value }
 
     let bounds = ChartBounds(in: size, left: 40, top: 12, right: 16, bottom: 26)
     // Zero-anchored axis, like the Compose renderer (max clamped to >= 1).
@@ -54,19 +46,19 @@ public struct AreaChartRenderer: ChartRenderer {
 
     // Map points into pixel space.
     let denom = CGFloat(max(1, values.count - 1))
-    let points: [CGPoint] = values.enumerated().map { index, value in
-      let t: CGFloat = values.count == 1 ? 0.5 : CGFloat(index) / denom
-      let x: CGFloat = bounds.left + bounds.width * t
+    let pixelPoints: [CGPoint] = values.enumerated().map { index, value in
+      let t = CGFloat(index) / denom
+      let x = bounds.left + bounds.width * t
       let norm = CGFloat(Double(value) / maxValue)
-      let y: CGFloat = bounds.bottom - norm * bounds.height
+      let y = bounds.bottom - norm * bounds.height
       return CGPoint(x: x, y: y)
     }
 
     // Smooth area + line + reveal + end dot (shared helper).
     drawSmoothLine(
       in: &context,
-      points: points,
-      color: data.color,
+      points: pixelPoints,
+      color: color,
       baseline: bounds.bottom,
       progress: progress,
       strokeWidth: 5,
@@ -77,36 +69,43 @@ public struct AreaChartRenderer: ChartRenderer {
 
     // Vertex dots, revealed alongside the trace.
     let revealRight = bounds.left + bounds.width * CGFloat(min(max(progress, 0), 1))
-    for point in points where point.x <= revealRight + 0.5 {
-      drawVertexDot(in: &context, center: point, color: data.color, radius: 4)
+    for point in pixelPoints where point.x <= revealRight + 0.5 {
+      drawVertexDot(in: &context, center: point, color: color, radius: 4)
     }
 
-    // X labels — driven by the points (values), thinned so they stay legible at
-    // small sizes (at most ~6). A label is only drawn when one exists at that
-    // index, so a short/long `labels` array can never crash or shift labels.
+    // X labels, thinned so they stay legible at small sizes (at most ~6). Each
+    // label travels with its point, so labels can never shift or run short.
     let maxLabels = 6
-    let labelStride = max(1, (points.count + maxLabels - 1) / maxLabels)
-    for index in points.indices
-    where index < data.labels.count && index % labelStride == 0 {
-      let text = Text(data.labels[index]).font(.system(size: 9)).foregroundColor(theme.label)
-      context.draw(text, at: CGPoint(x: points[index].x, y: bounds.bottom + 13), anchor: .center)
+    let labelStride = max(1, (pixelPoints.count + maxLabels - 1) / maxLabels)
+    for index in pixelPoints.indices where index % labelStride == 0 {
+      let label = points[index].label
+      guard !label.isEmpty else { continue }
+      let text = Text(label).font(.system(size: 9)).foregroundColor(theme.label)
+      context.draw(text, at: CGPoint(x: pixelPoints[index].x, y: bounds.bottom + 13), anchor: .center)
     }
   }
 }
 
 /// A smooth area chart with a soft gradient fill and an animated reveal.
 public struct AreaChart: View {
-  public let data: AreaChartData
+  public let points: [ChartPoint]
+  public let color: Color
   public var animate: Bool
   public var replay: Int
 
-  public init(data: AreaChartData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(points: [ChartPoint], color: Color = DrafterColors.blue, animate: Bool = true, replay: Int = 0) {
+    self.points = points
+    self.color = color
     self.animate = animate
     self.replay = replay
   }
 
+  /// Convenience for unlabeled data: one value per point, blank x-axis labels.
+  public init(values: [Float], color: Color = DrafterColors.blue, animate: Bool = true, replay: Int = 0) {
+    self.init(points: values.map(ChartPoint.init), color: color, animate: animate, replay: replay)
+  }
+
   public var body: some View {
-    ChartCanvas(renderer: AreaChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: AreaChartRenderer(points: points, color: color), animate: animate, duration: 0.9, replay: replay)
   }
 }

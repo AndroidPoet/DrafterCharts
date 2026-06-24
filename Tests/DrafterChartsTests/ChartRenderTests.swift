@@ -17,8 +17,6 @@ import XCTest
 final class ChartRenderTests: XCTestCase {
   private let size = CGSize(width: 320, height: 240)
   private let palette = DrafterColors.palette
-  private let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-  private let quarters = ["Q1", "Q2", "Q3", "Q4"]
 
   /// Asserts the rendered chart fills at least `minRatio` of its pixels with
   /// non-background content — a guard against fully blank / broken renders.
@@ -42,35 +40,29 @@ final class ChartRenderTests: XCTestCase {
 
   func testAreaChartRenders() throws {
     let chart = AreaChart(
-      data: AreaChartData(labels: months, values: [12, 18, 9, 24, 20, 30]),
+      points: [ChartPoint("Jan", 12), ChartPoint("Feb", 18), ChartPoint("Mar", 9), ChartPoint("Apr", 24)],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "AreaChart")
   }
 
   func testLineChartRenders() throws {
-    let chart = LineChart(
-      data: SimpleLineChartData(labels: months, values: [40, 65, 50, 80, 70, 95]),
-      animate: false
-    )
+    let chart = LineChart(values: [40, 65, 50, 80, 70, 95], animate: false)
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "LineChart")
   }
 
   func testStepLineChartRenders() throws {
-    let chart = StepLineChart(
-      data: StepLineChartData(labels: months, values: [10, 10, 25, 18, 32, 28]),
-      animate: false
-    )
+    let chart = StepLineChart(values: [10, 10, 25, 18, 32, 28], animate: false)
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "StepLineChart")
   }
 
   func testStackedLineChartRenders() throws {
     let chart = StackedLineChart(
-      data: StackedLineChartData(
-        labels: months,
-        stacks: [[10, 8], [14, 10], [12, 14], [20, 12], [18, 16], [24, 14]],
-        colors: [palette[2], palette[4]]
-      ),
+      series: [
+        ChartSeries(color: palette[2], values: [10, 14, 12, 20, 18, 24]),
+        ChartSeries(color: palette[4], values: [8, 10, 14, 12, 16, 14]),
+      ],
+      categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "StackedLineChart")
@@ -78,13 +70,11 @@ final class ChartRenderTests: XCTestCase {
 
   func testStreamGraphChartRenders() throws {
     let chart = StreamGraphChart(
-      data: StreamData(
-        labels: months,
-        series: [
-          StreamSeries(name: "A", values: [4, 6, 8, 7, 9, 6], color: palette[0]),
-          StreamSeries(name: "B", values: [3, 4, 6, 8, 7, 9], color: palette[1]),
-        ]
-      ),
+      series: [
+        ChartSeries(name: "A", color: palette[0], values: [4, 6, 8, 7, 9, 6]),
+        ChartSeries(name: "B", color: palette[1], values: [3, 4, 6, 8, 7, 9]),
+      ],
+      categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "StreamGraphChart")
@@ -93,32 +83,34 @@ final class ChartRenderTests: XCTestCase {
   // MARK: - Bars
 
   func testSimpleBarChartRenders() throws {
-    let chart = SimpleBarChart(
-      data: SimpleBarChartData(labels: quarters, values: [24, 38, 30, 46]),
-      animate: false
-    )
+    let chart = SimpleBarChart(values: [24, 38, 30, 46], animate: false)
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "SimpleBarChart")
   }
 
   func testStackedBarChartRenders() throws {
     let chart = StackedBarChart(
-      data: StackedBarChartData(labels: quarters, stacks: [[12, 8, 6], [16, 10, 8], [14, 12, 10], [20, 14, 9]]),
+      series: [
+        ChartSeries(color: palette[0], values: [12, 16, 14, 20]),
+        ChartSeries(color: palette[1], values: [8, 10, 12, 14]),
+        ChartSeries(color: palette[2], values: [6, 8, 10, 9]),
+      ],
+      categories: ["Q1", "Q2", "Q3", "Q4"],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "StackedBarChart")
   }
 
   func testHistogramRenders() throws {
-    let chart = Histogram(
-      data: HistogramData(dataPoints: [2, 3, 3, 4, 5, 5, 6, 7, 8, 9, 10, 12, 13, 15], binCount: 5),
-      animate: false
-    )
+    let chart = Histogram(values: [2, 3, 3, 4, 5, 5, 6, 7, 8, 9, 10, 12, 13, 15], binCount: 5, animate: false)
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "Histogram")
   }
 
   func testWaterfallChartRenders() throws {
     let chart = WaterfallChart(
-      data: WaterfallChartData(labels: ["Start", "Sales", "Costs", "Net"], values: [0, 60, -25, 0], initialValue: 50),
+      steps: [WaterfallStep("Sales", 60), WaterfallStep("Costs", -25)],
+      initialValue: 50,
+      startLabel: "Start",
+      totalLabel: "Net",
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "WaterfallChart")
@@ -134,10 +126,10 @@ final class ChartRenderTests: XCTestCase {
 
   func testGanttChartRenders() throws {
     let chart = GanttChart(
-      data: GanttChartData(
-        tasks: [GanttTask(name: "Design", startMonth: 0, duration: 2), GanttTask(name: "Build", startMonth: 2, duration: 3)],
-        taskColors: [palette[0], palette[1]]
-      ),
+      tasks: [
+        GanttTask(name: "Design", startMonth: 0, duration: 2, color: palette[0]),
+        GanttTask(name: "Build", startMonth: 2, duration: 3, color: palette[1]),
+      ],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "GanttChart")
@@ -207,7 +199,7 @@ final class ChartRenderTests: XCTestCase {
 
   func testRadarChartRenders() throws {
     let chart = RadarChart(
-      data: [RadarChartData(values: ["Speed": 0.8, "Power": 0.6, "Range": 0.9, "Agility": 0.5, "Armor": 0.7])],
+      series: [RadarSeries(color: palette[0], values: ["Speed": 0.8, "Power": 0.6, "Range": 0.9, "Agility": 0.5, "Armor": 0.7])],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "RadarChart")
@@ -222,7 +214,10 @@ final class ChartRenderTests: XCTestCase {
 
   func testScatterPlotRenders() throws {
     let chart = ScatterPlot(
-      data: ScatterPlotData(points: [(1, 2), (2, 5), (3, 3), (4, 8), (5, 6), (6, 9)], pointColors: palette),
+      points: [
+        ScatterPoint(x: 1, y: 2), ScatterPoint(x: 2, y: 5), ScatterPoint(x: 3, y: 3),
+        ScatterPoint(x: 4, y: 8), ScatterPoint(x: 5, y: 6), ScatterPoint(x: 6, y: 9),
+      ],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "ScatterPlot")
@@ -279,15 +274,6 @@ final class ChartRenderTests: XCTestCase {
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "Heatmap")
   }
 
-  // MARK: - Convenience (values-first) initializers
-
-  func testValuesFirstInitializersRender() throws {
-    assertNotBlank(try RenderHarness.bitmap(LineChart(values: [40, 65, 50, 80], animate: false), size: size), "LineChart(values:)")
-    assertNotBlank(try RenderHarness.bitmap(AreaChart(values: [12, 18, 9, 24], animate: false), size: size), "AreaChart(values:)")
-    assertNotBlank(try RenderHarness.bitmap(SimpleBarChart(values: [24, 38, 30, 46], animate: false), size: size), "SimpleBarChart(values:)")
-    assertNotBlank(try RenderHarness.bitmap(StepLineChart(values: [10, 25, 18, 32], animate: false), size: size), "StepLineChart(values:)")
-  }
-
   // MARK: - Sankey (regression: flow bands must render)
 
   func testSankeyChartRenders() throws {
@@ -303,8 +289,6 @@ final class ChartRenderTests: XCTestCase {
     let renderSize = CGSize(width: 400, height: 300)
     let bitmap = try RenderHarness.bitmap(SankeyChart(data: sankeyData, animate: false), size: renderSize)
 
-    // Columns sit at ~8% (left), ~50% (middle) and ~92% (right) of the width.
-    // The strip from 18%..42% is purely band territory — no node bars there.
     let gap = CGRect(
       x: renderSize.width * 0.18,
       y: 0,

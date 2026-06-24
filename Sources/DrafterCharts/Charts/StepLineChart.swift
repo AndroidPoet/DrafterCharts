@@ -2,34 +2,27 @@
 //  StepLineChart.swift
 //  DrafterCharts
 //
-//  Stepped line chart: values are connected with horizontal-then-vertical
-//  segments (no smoothing), a soft gradient fill fades to the baseline below
-//  the steps, a left-to-right reveal clips the trace, and vertex dots mark
-//  each data point. Mirrors the Compose `StepLineChartRenderer`.
+//  Stepped line chart: an array of `ChartPoint` (label bound to value) connected
+//  with horizontal-then-vertical segments (no smoothing), a soft gradient fill
+//  that fades to the baseline below the steps, a left-to-right reveal that clips
+//  the trace, and vertex dots at each data point. Mirrors the Compose
+//  `StepLineChartRenderer`.
 //
 
 import SwiftUI
 
-/// Data for a `StepLineChart`: parallel `labels` and `values`, plus a line color.
-public struct StepLineChartData: Equatable, Sendable {
-  public var labels: [String]
-  public var values: [Float]
-  public var color: Color
+/// Draws a stepped line chart from `[ChartPoint]` as horizontal/vertical steps.
+public struct StepLineChartRenderer: ChartRenderer {
+  public let points: [ChartPoint]
+  public let color: Color
 
-  public init(labels: [String], values: [Float], color: Color = DrafterColors.teal) {
-    self.labels = labels
-    self.values = values
+  public init(points: [ChartPoint], color: Color = DrafterColors.teal) {
+    self.points = points
     self.color = color
   }
-}
-
-/// Draws a `StepLineChartData` into a canvas as horizontal/vertical steps.
-public struct StepLineChartRenderer: ChartRenderer {
-  public let data: StepLineChartData
-  public init(data: StepLineChartData) { self.data = data }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let values = data.values
+    let values = points.map { $0.value }
     guard !values.isEmpty else { return }
 
     let bounds = ChartBounds(in: size, left: 40, top: 12, right: 16, bottom: 26)
@@ -54,7 +47,7 @@ public struct StepLineChartRenderer: ChartRenderer {
 
     // Map data points to pixel space.
     let count = values.count
-    let points: [CGPoint] = values.enumerated().map { index, value in
+    let pixelPoints: [CGPoint] = values.enumerated().map { index, value in
       let x: CGFloat
       if count == 1 {
         x = bounds.left + bounds.width / 2
@@ -66,7 +59,7 @@ public struct StepLineChartRenderer: ChartRenderer {
     }
 
     // Stepped path: horizontal to next x at the previous y, then vertical to next y.
-    let stepPath = steppedPath(points)
+    let stepPath = steppedPath(pixelPoints)
 
     let clamped = CGFloat(min(max(progress, 0), 1))
     let revealRight = bounds.left + bounds.width * clamped
@@ -75,17 +68,17 @@ public struct StepLineChartRenderer: ChartRenderer {
     var clip = context
     clip.clip(to: Path(CGRect(x: 0, y: 0, width: revealRight, height: size.height)))
 
-    if let first = points.first, let last = points.last {
+    if let first = pixelPoints.first, let last = pixelPoints.last {
       var fillPath = stepPath
       fillPath.addLine(to: CGPoint(x: last.x, y: bounds.bottom))
       fillPath.addLine(to: CGPoint(x: first.x, y: bounds.bottom))
       fillPath.closeSubpath()
 
-      let topY = points.map(\.y).min() ?? bounds.top
+      let topY = pixelPoints.map(\.y).min() ?? bounds.top
       clip.fill(
         fillPath,
         with: .linearGradient(
-          Gradient(colors: [data.color.opacity(0.22), data.color.opacity(0)]),
+          Gradient(colors: [color.opacity(0.22), color.opacity(0)]),
           startPoint: CGPoint(x: 0, y: topY),
           endPoint: CGPoint(x: 0, y: bounds.bottom)
         )
@@ -95,24 +88,25 @@ public struct StepLineChartRenderer: ChartRenderer {
     // Stepped line with rounded caps/joins.
     clip.stroke(
       stepPath,
-      with: .color(data.color),
+      with: .color(color),
       style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
     )
 
     // Vertex dots at each revealed data point.
-    for point in points where point.x <= revealRight + 0.5 {
-      drawVertexDot(in: &context, center: point, color: data.color, radius: 4)
+    for point in pixelPoints where point.x <= revealRight + 0.5 {
+      drawVertexDot(in: &context, center: point, color: color, radius: 4)
     }
 
-    // X-axis labels — driven by the points (values) and thinned so they stay
-    // legible at small sizes (at most ~6). Each label is bounds-checked, so a
-    // short/long `labels` array can never crash or draw a mismatched label.
+    // X-axis labels, thinned so they stay legible at small sizes (at most ~6).
+    // Each label travels with its point, so labels can never shift or run short;
+    // blank labels (unlabeled points) are simply skipped.
     let maxLabels = 6
-    let labelStride = max(1, (points.count + maxLabels - 1) / maxLabels)
-    for (index, point) in points.enumerated() {
-      guard index < data.labels.count, index % labelStride == 0 else { continue }
-      let text = Text(data.labels[index]).font(.system(size: 9)).foregroundColor(theme.label)
-      context.draw(text, at: CGPoint(x: point.x, y: bounds.bottom + 13), anchor: .center)
+    let labelStride = max(1, (pixelPoints.count + maxLabels - 1) / maxLabels)
+    for index in pixelPoints.indices where index % labelStride == 0 {
+      let label = points[index].label
+      guard !label.isEmpty else { continue }
+      let text = Text(label).font(.system(size: 9)).foregroundColor(theme.label)
+      context.draw(text, at: CGPoint(x: pixelPoints[index].x, y: bounds.bottom + 13), anchor: .center)
     }
   }
 
@@ -132,17 +126,24 @@ public struct StepLineChartRenderer: ChartRenderer {
 
 /// A stepped line chart with a soft gradient fill and a left-to-right reveal.
 public struct StepLineChart: View {
-  public let data: StepLineChartData
+  public let points: [ChartPoint]
+  public let color: Color
   public var animate: Bool
   public var replay: Int
 
-  public init(data: StepLineChartData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(points: [ChartPoint], color: Color = DrafterColors.teal, animate: Bool = true, replay: Int = 0) {
+    self.points = points
+    self.color = color
     self.animate = animate
     self.replay = replay
   }
 
+  /// Convenience for unlabeled data: one value per point, blank x-axis labels.
+  public init(values: [Float], color: Color = DrafterColors.teal, animate: Bool = true, replay: Int = 0) {
+    self.init(points: values.map(ChartPoint.init), color: color, animate: animate, replay: replay)
+  }
+
   public var body: some View {
-    ChartCanvas(renderer: StepLineChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: StepLineChartRenderer(points: points, color: color), animate: animate, duration: 0.9, replay: replay)
   }
 }

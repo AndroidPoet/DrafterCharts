@@ -2,10 +2,11 @@
 //  MismatchSafetyTests.swift
 //  DrafterChartsTests
 //
-//  Charts take parallel arrays (labels / values / colors) that callers can pass
-//  with mismatched lengths. These tests feed deliberately-malformed data and
-//  assert the renderer neither crashes nor produces ghost columns — element
-//  counts are driven by the value arrays, and label/color lookups are bounds-safe.
+//  With the point-based API, a label can no longer desync from its value and a
+//  color can't index past its data — those mismatches are unrepresentable, so
+//  they need no test. What remains is multi-series data where each `ChartSeries`
+//  may carry a different number of values (ragged), and empty input. These tests
+//  feed those edges and assert the renderer never crashes or draws garbage.
 //
 
 import SwiftUI
@@ -27,18 +28,14 @@ final class MismatchSafetyTests: XCTestCase {
     XCTAssertGreaterThan(ratio, 0.002, "\(message): rendered effectively blank (\(ratio))", file: file, line: line)
   }
 
-  // MARK: - Waterfall: Start/Total bars + the original 4-label/3-value example
+  // MARK: - Waterfall Start / Total (the example that originally confused labels)
 
-  func testWaterfallStartAndTotalBarsRenderUsersExample() throws {
-    // The exact snippet that originally confused the labels: 4 labels, 3 deltas.
+  func testWaterfallStartAndTotalRenders() throws {
     let chart = WaterfallChart(
-      data: WaterfallChartData(
-        labels: ["Start", "Revenue", "Cost", "Profit"],
-        values: [50, -20, 30],
-        initialValue: 100,
-        showInitialBar: true,
-        showTotalBar: true
-      ),
+      steps: [WaterfallStep("Revenue", 50), WaterfallStep("Cost", -20), WaterfallStep("Profit", 30)],
+      initialValue: 100,
+      startLabel: "Start",
+      totalLabel: "Total",
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "Waterfall Start/Total")
@@ -47,147 +44,94 @@ final class MismatchSafetyTests: XCTestCase {
   func testWaterfallLeadingStartBarHasContent() throws {
     let renderSize = CGSize(width: 400, height: 300)
     let chart = WaterfallChart(
-      data: WaterfallChartData(
-        labels: ["Start", "A", "B"],
-        values: [40, -15],
-        initialValue: 80,
-        showInitialBar: true
-      ),
+      steps: [WaterfallStep("A", 40), WaterfallStep("B", -15)],
+      initialValue: 80,
+      startLabel: "Start",
       animate: false
     )
     let bitmap = try RenderHarness.bitmap(chart, size: renderSize)
-    // The Start bar is the leftmost column; assert the left ~22% strip (past the
+    // The Start bar is the leftmost column; assert the left strip (past the
     // y-axis labels) has a tall bar rather than being empty.
     let leftStrip = CGRect(x: renderSize.width * 0.10, y: 0, width: renderSize.width * 0.18, height: renderSize.height)
     XCTAssertGreaterThan(bitmap.contentPixels(in: leftStrip), 200, "Waterfall Start bar missing")
   }
 
-  func testWaterfallMoreLabelsThanValuesDoesNotCrash() throws {
-    // Five labels, two deltas, no bookend bars: must render two bars, no ghosts.
-    let chart = WaterfallChart(
-      data: WaterfallChartData(
-        labels: ["a", "b", "c", "d", "e"],
-        values: [20, -5],
-        initialValue: 10
-      ),
+  // MARK: - Ragged multi-series (series of differing value lengths)
+
+  func testGroupedLineRaggedSeriesDoesNotCrash() throws {
+    let chart = GroupedLineChart(
+      series: [
+        ChartSeries(name: "A", color: palette[0], values: [30, 20, 40, 70]),
+        ChartSeries(name: "B", color: palette[1], values: [45, 35]),        // shorter
+      ],
+      categories: ["Jan", "Feb", "Mar", "Apr"],
+      animate: false
+    )
+    assertNotBlank(try RenderHarness.bitmap(chart, size: size), "GroupedLine ragged")
+  }
+
+  func testGroupedBarRaggedSeriesDoesNotCrash() throws {
+    let chart = GroupedBarChart(
+      series: [
+        ChartSeries(name: "A", color: palette[0], values: [10, 20, 30]),
+        ChartSeries(name: "B", color: palette[1], values: [15]),            // shorter
+        ChartSeries(name: "C", color: palette[2], values: [25, 35, 18, 22]), // longer
+      ],
+      categories: ["Q1", "Q2", "Q3"],
+      animate: false
+    )
+    assertNotBlank(try RenderHarness.bitmap(chart, size: size), "GroupedBar ragged")
+  }
+
+  func testStackedBarRaggedSeriesDoesNotCrash() throws {
+    let chart = StackedBarChart(
+      series: [
+        ChartSeries(color: palette[0], values: [5, 8, 6]),
+        ChartSeries(color: palette[1], values: [10, 4]),                    // shorter
+        ChartSeries(color: palette[2], values: [7]),                       // shorter still
+      ],
+      categories: ["Q1", "Q2", "Q3"],
+      animate: false
+    )
+    assertNotBlank(try RenderHarness.bitmap(chart, size: size), "StackedBar ragged")
+  }
+
+  func testStreamGraphRaggedSeriesDoesNotCrash() throws {
+    let chart = StreamGraphChart(
+      series: [
+        ChartSeries(name: "A", color: palette[0], values: [4, 6, 8, 7]),
+        ChartSeries(name: "B", color: palette[1], values: [3, 4]),          // shorter
+      ],
+      categories: ["Jan", "Feb", "Mar", "Apr"],
       animate: false
     )
     _ = try RenderHarness.bitmap(chart, size: size) // returning a bitmap == no crash
   }
 
-  // MARK: - Single-series: labels vs values mismatch
-
-  func testAreaAndLineTolerateMismatchedLabels() throws {
-    let values: [Float] = [12, 18, 9, 24, 20]
-    let tooFew = ["Jan", "Feb"]
-    let tooMany = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"]
-
-    assertNotBlank(try RenderHarness.bitmap(AreaChart(values: values, labels: tooFew, animate: false), size: size), "Area few labels")
-    assertNotBlank(try RenderHarness.bitmap(AreaChart(values: values, labels: tooMany, animate: false), size: size), "Area many labels")
-    assertNotBlank(try RenderHarness.bitmap(LineChart(values: values, labels: tooFew, animate: false), size: size), "Line few labels")
-    assertNotBlank(try RenderHarness.bitmap(StepLineChart(values: values, labels: tooMany, animate: false), size: size), "Step many labels")
-  }
-
-  // MARK: - Bars: labels/colors mismatch
-
-  func testSimpleBarToleratesMismatchedLabelsAndColors() throws {
-    let chart = SimpleBarChart(
-      data: SimpleBarChartData(
-        labels: ["only", "two"],            // fewer than values
-        values: [10, 20, 30, 40],
-        colors: [palette[0]]                // fewer than values
-      ),
+  func testFewerCategoriesThanValuesDoesNotCrash() throws {
+    // Categories shorter than the series — extra points simply render unlabeled.
+    let chart = GroupedBarChart(
+      series: [ChartSeries(name: "A", color: palette[0], values: [10, 20, 30, 40, 50])],
+      categories: ["only", "two"],
       animate: false
     )
-    assertNotBlank(try RenderHarness.bitmap(chart, size: size), "SimpleBar mismatch")
+    assertNotBlank(try RenderHarness.bitmap(chart, size: size), "Few categories")
   }
 
-  func testGroupedAndStackedBarsTolerateRaggedRows() throws {
-    let grouped = GroupedBarChart(
-      data: GroupedBarChartData(
-        labels: ["Q1", "Q2", "Q3"],
-        itemNames: ["A", "B", "C"],         // more series than some rows provide
-        groupedValues: [[10, 20], [30], [15, 25, 35]],
-        colors: [palette[0]]
-      ),
-      animate: false
-    )
-    assertNotBlank(try RenderHarness.bitmap(grouped, size: size), "Grouped ragged")
+  // MARK: - Empty input
 
-    let stacked = StackedBarChart(
-      data: StackedBarChartData(
-        labels: ["Q1"],                      // fewer labels than stacks
-        stacks: [[5, 8, 6], [10, 4], [7]],
-        colors: [palette[1]]
-      ),
-      animate: false
+  func testEmptyInputDoesNotCrash() throws {
+    _ = try RenderHarness.bitmap(AreaChart(values: [], animate: false), size: size)
+    _ = try RenderHarness.bitmap(LineChart(values: [], animate: false), size: size)
+    _ = try RenderHarness.bitmap(SimpleBarChart(values: [], animate: false), size: size)
+    _ = try RenderHarness.bitmap(GroupedLineChart(series: [], animate: false), size: size)
+    _ = try RenderHarness.bitmap(StackedBarChart(series: [], animate: false), size: size)
+    _ = try RenderHarness.bitmap(ScatterPlot(points: [], animate: false), size: size)
+    _ = try RenderHarness.bitmap(RadarChart(series: [], animate: false), size: size)
+    _ = try RenderHarness.bitmap(StreamGraphChart(series: [], animate: false), size: size)
+    _ = try RenderHarness.bitmap(GanttChart(tasks: [], animate: false), size: size)
+    _ = try RenderHarness.bitmap(
+      WaterfallChart(steps: [], initialValue: 0, animate: false), size: size
     )
-    assertNotBlank(try RenderHarness.bitmap(stacked, size: size), "Stacked ragged")
-  }
-
-  // MARK: - Multi-series & color-array mismatch
-
-  func testGroupedLineToleratesColorAndRowMismatch() throws {
-    let chart = GroupedLineChart(
-      data: GroupedLineChartData(
-        labels: ["Jan", "Feb", "Mar"],
-        itemNames: ["A", "B"],
-        groupedValues: [[30, 20], [45], [40, 50]], // ragged middle row
-        colors: []                                  // no colors at all
-      ),
-      animate: false
-    )
-    assertNotBlank(try RenderHarness.bitmap(chart, size: size), "GroupedLine mismatch")
-  }
-
-  func testScatterToleratesPointColorMismatch() throws {
-    let chart = ScatterPlot(
-      data: ScatterPlotData(
-        points: [(1, 2), (2, 5), (3, 3), (4, 8)],
-        pointColors: [palette[0]]            // one color, four points
-      ),
-      animate: false
-    )
-    assertNotBlank(try RenderHarness.bitmap(chart, size: size), "Scatter color mismatch")
-  }
-
-  func testRadarToleratesColorMismatchAndDifferingAxes() throws {
-    let chart = RadarChart(
-      data: [
-        RadarChartData(values: ["Speed": 0.8, "Power": 0.6, "Range": 0.9]),
-        RadarChartData(values: ["Speed": 0.5, "Power": 0.9]), // missing an axis
-      ],
-      colors: []                              // no colors
-    )
-    assertNotBlank(try RenderHarness.bitmap(chart, size: size), "Radar mismatch")
-  }
-
-  func testStreamGraphToleratesRaggedSeries() throws {
-    let chart = StreamGraphChart(
-      data: StreamData(
-        labels: ["Jan", "Feb", "Mar", "Apr"],
-        series: [
-          StreamSeries(name: "A", values: [4, 6, 8, 7], color: palette[0]),
-          StreamSeries(name: "B", values: [3, 4], color: palette[1]), // short series
-        ]
-      ),
-      animate: false
-    )
-    _ = try RenderHarness.bitmap(chart, size: size) // no crash on ragged series
-  }
-
-  func testGanttToleratesColorMismatch() throws {
-    let chart = GanttChart(
-      data: GanttChartData(
-        tasks: [
-          GanttTask(name: "Design", startMonth: 0, duration: 2),
-          GanttTask(name: "Build", startMonth: 2, duration: 3),
-          GanttTask(name: "Ship", startMonth: 5, duration: 1),
-        ],
-        taskColors: [palette[0]]              // one color, three tasks
-      ),
-      animate: false
-    )
-    assertNotBlank(try RenderHarness.bitmap(chart, size: size), "Gantt color mismatch")
   }
 }

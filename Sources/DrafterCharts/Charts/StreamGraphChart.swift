@@ -5,53 +5,31 @@
 //  A stream graph (themeriver): several series stacked as smooth flowing bands
 //  centred around the chart midline so the whole thing reads like a river. The
 //  stack grows symmetrically outward from its centre as it reveals. Mirrors the
-//  Compose `stream/` renderer: an immutable data struct, a pure `ChartRenderer`,
+//  Compose `stream/` renderer: shared `ChartSeries` data, a pure `ChartRenderer`,
 //  and a thin view that hosts it in `ChartCanvas`.
 //
 
 import SwiftUI
 
-/// A single flowing band in a `StreamGraphChart`.
-///
-/// - `name`: human-readable series name.
-/// - `values`: one value per x point; should match the chart's `labels` count.
-/// - `color`: the band fill colour.
-public struct StreamSeries: Equatable, Sendable {
-  public var name: String
-  public var values: [Float]
-  public var color: Color
-
-  public init(name: String, values: [Float], color: Color) {
-    self.name = name
-    self.values = values
-    self.color = color
-  }
-}
-
-/// Data for a `StreamGraphChart`: several `series` stacked and centred around the
-/// chart midline so they flow like a river. All series share `labels`.
-public struct StreamData: Equatable, Sendable {
-  public var labels: [String]
-  public var series: [StreamSeries]
-
-  public init(labels: [String], series: [StreamSeries]) {
-    self.labels = labels
-    self.series = series
-  }
-}
-
-/// Renders a `StreamData` as a themeriver: each series flows as a smooth band,
-/// the stack centred symmetrically around the chart midline.
+/// Renders `[ChartSeries]` as a themeriver: each series flows as a smooth band,
+/// the stack centred symmetrically around the chart midline. Each band uses its
+/// series' own `color`, so a colour can never desync from its data. `categories`
+/// supplies the optional x-axis labels.
 public struct StreamGraphChartRenderer: ChartRenderer {
-  public let data: StreamData
-  public init(data: StreamData) { self.data = data }
+  public let series: [ChartSeries]
+  public let categories: [String]
+
+  public init(series: [ChartSeries], categories: [String] = []) {
+    self.series = series
+    self.categories = categories
+  }
 
   /// Number of x points shared by every series. Driven by the series' own value
   /// arrays — the common minimum length across all series so the stack only
-  /// samples indices that every series actually has — never by `labels.count`.
-  /// Ragged or over-long label arrays can't introduce phantom samples this way.
+  /// samples indices that every series actually has — never by `categories.count`.
+  /// Ragged or over-long category arrays can't introduce phantom samples this way.
   private var pointCount: Int {
-    data.series.map { $0.values.count }.min() ?? 0
+    series.map { $0.values.count }.min() ?? 0
   }
 
   /// The largest total stacked value across all x points (drives the y scale).
@@ -59,7 +37,7 @@ public struct StreamGraphChartRenderer: ChartRenderer {
     var maxV: Float = 0
     for i in 0..<count {
       var total: Float = 0
-      for s in data.series { total += s.value(at: i) }
+      for s in series { total += s.value(at: i) }
       if total > maxV { maxV = total }
     }
     return maxV
@@ -67,7 +45,7 @@ public struct StreamGraphChartRenderer: ChartRenderer {
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
     let count = pointCount
-    guard count >= 2, !data.series.isEmpty else { return }
+    guard count >= 2, !series.isEmpty else { return }
 
     let p = CGFloat(min(max(progress, 0), 1))
 
@@ -87,8 +65,8 @@ public struct StreamGraphChartRenderer: ChartRenderer {
     let xs: [CGFloat] = (0..<count).map { chartLeft + CGFloat($0) * stepX }
 
     // Per-series thickness (in pixels, pre-progress) at each x.
-    let thickness: [[CGFloat]] = data.series.map { series in
-      (0..<count).map { CGFloat(series.value(at: $0)) * yScale }
+    let thickness: [[CGFloat]] = series.map { s in
+      (0..<count).map { CGFloat(s.value(at: $0)) * yScale }
     }
 
     // Centred baseline (top edge of the whole stack) at each x. Scale the
@@ -105,7 +83,7 @@ public struct StreamGraphChartRenderer: ChartRenderer {
 
     // Running cumulative top per x; each series stacks below the previous one.
     var runningTop = stackTop
-    for (idx, series) in data.series.enumerated() {
+    for (idx, s) in series.enumerated() {
       let layer = thickness[idx]
       var topEdge = [CGPoint]()
       var bottomEdge = [CGPoint]()
@@ -121,7 +99,7 @@ public struct StreamGraphChartRenderer: ChartRenderer {
         runningTop[i] = bottom
       }
 
-      drawBand(in: &context, topEdge: topEdge, bottomEdge: bottomEdge, color: series.color)
+      drawBand(in: &context, topEdge: topEdge, bottomEdge: bottomEdge, color: s.color)
     }
 
     drawXLabels(in: &context, theme: theme, xs: xs, baseline: chartTop + chartHeight)
@@ -189,23 +167,25 @@ public struct StreamGraphChartRenderer: ChartRenderer {
   // MARK: - Labels
 
   /// Draws a sparse set of x labels (at most 6) along the bottom of the chart.
+  /// Reads from `categories`, only drawing a label when the index exists in both
+  /// the category array and the mapped x positions.
   private func drawXLabels(in context: inout GraphicsContext, theme: DrafterThemeColors, xs: [CGFloat], baseline: CGFloat) {
-    guard !data.labels.isEmpty else { return }
+    guard !categories.isEmpty else { return }
     let maxLabels = 6
-    let labelCount = data.labels.count
+    let labelCount = categories.count
     let stride = max(1, (labelCount + maxLabels - 1) / maxLabels)
 
     var i = 0
     while i < labelCount {
       if i >= xs.count { break }
-      let text = Text(data.labels[i]).font(.system(size: 10)).foregroundColor(theme.label)
+      let text = Text(categories[i]).font(.system(size: 10)).foregroundColor(theme.label)
       context.draw(text, at: CGPoint(x: xs[i], y: baseline + 6 + 6), anchor: .center)
       i += stride
     }
   }
 }
 
-private extension StreamSeries {
+private extension ChartSeries {
   /// The value at `index`, or 0 when this series is shorter than the stack.
   func value(at index: Int) -> Float {
     index >= 0 && index < values.count ? values[index] : 0
@@ -214,19 +194,27 @@ private extension StreamSeries {
 
 /// A stream graph (themeriver): stacked series that flow as smooth bands centred
 /// around the chart midline, growing symmetrically outward from the centre as
-/// they animate in.
+/// they animate in. Each band's colour is bound to its `ChartSeries`; `categories`
+/// supplies the optional x-axis labels.
 public struct StreamGraphChart: View {
-  public let data: StreamData
+  public let series: [ChartSeries]
+  public let categories: [String]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: StreamData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(series: [ChartSeries], categories: [String] = [], animate: Bool = true, replay: Int = 0) {
+    self.series = series
+    self.categories = categories
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: StreamGraphChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(
+      renderer: StreamGraphChartRenderer(series: series, categories: categories),
+      animate: animate,
+      duration: 0.9,
+      replay: replay
+    )
   }
 }

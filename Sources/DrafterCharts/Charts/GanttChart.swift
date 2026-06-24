@@ -7,51 +7,43 @@
 //  task placed at (startMonth, duration). Each bar's width (and opacity) grows
 //  with the reveal progress. Ported from the Kotlin Compose `GanttChart`.
 //
-//  Follows the canonical chart pattern: an immutable data struct, a pure
-//  `ChartRenderer`, and a thin view that hosts it in `ChartCanvas`.
+//  Follows the canonical chart pattern: a renderer that holds its `[GanttTask]`
+//  directly, and a thin view that hosts it in `ChartCanvas`. Each task carries
+//  its own optional `color`, so a bar and its color can never get out of sync.
 //
 
 import SwiftUI
 
-/// One row of a `GanttChart`: a `name`, its `startMonth` on the timeline, and a
-/// `duration` in months.
+/// One row of a `GanttChart`: a `name`, its `startMonth` on the timeline, a
+/// `duration` in months, and an optional bar `color` (falls back to the theme
+/// palette when `nil`).
 public struct GanttTask: Equatable, Sendable {
   public var name: String
-  public var startMonth: Float
-  public var duration: Float
+  public var startMonth: Int
+  public var duration: Int
+  public var color: Color?
 
-  public init(name: String, startMonth: Float, duration: Float) {
+  public init(name: String, startMonth: Int, duration: Int, color: Color? = nil) {
     self.name = name
     self.startMonth = startMonth
     self.duration = duration
+    self.color = color
   }
 }
 
-/// Data for a `GanttChart`: the ordered `tasks` plus a parallel list of bar
-/// `taskColors` (cycled/defaulted when shorter than `tasks`).
-public struct GanttChartData: Equatable, Sendable {
-  public var tasks: [GanttTask]
-  public var taskColors: [Color]
-
-  public init(tasks: [GanttTask], taskColors: [Color]? = nil) {
-    self.tasks = tasks
-    self.taskColors = taskColors ?? Array(repeating: DrafterColors.blue, count: tasks.count)
-  }
-}
-
-/// Draws a `GanttChartData` into a canvas as a horizontal timeline of bars.
+/// Draws an ordered `[GanttTask]` into a canvas as a horizontal timeline of bars.
 public struct GanttChartRenderer: ChartRenderer {
-  public let data: GanttChartData
-  public init(data: GanttChartData) { self.data = data }
+  public let tasks: [GanttTask]
+  public init(tasks: [GanttTask]) { self.tasks = tasks }
 
   /// Largest `startMonth + duration` across all tasks, clamped to at least 1.
-  private var maxMonth: Float {
-    let m = data.tasks.map { $0.startMonth + $0.duration }.max() ?? 1
+  private var maxMonth: Int {
+    let m = tasks.map { $0.startMonth + $0.duration }.max() ?? 1
     return max(m, 1)
   }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    guard size.width >= 1, size.height >= 1, !data.tasks.isEmpty else { return }
+    guard size.width >= 1, size.height >= 1, !tasks.isEmpty else { return }
 
     // Compose layout: 20% left margin, 70% width, 10% top inset, 80% height.
     let chartHeight = size.height * 0.8
@@ -61,7 +53,6 @@ public struct GanttChartRenderer: ChartRenderer {
     let chartLeft = size.width * 0.2
 
     let safeMaxMonth = CGFloat(maxMonth)
-    let tasks = data.tasks
 
     drawAxes(in: &context, left: chartLeft, top: chartTop, bottom: chartBottom, width: chartWidth, theme: theme)
     drawYAxisLabels(in: &context, left: chartLeft, top: chartTop, bottom: chartBottom, tasks: tasks, theme: theme)
@@ -83,9 +74,8 @@ public struct GanttChartRenderer: ChartRenderer {
       let startX = chartLeft + (CGFloat(task.startMonth) / safeMaxMonth) * chartWidth
       let width = max((CGFloat(task.duration) / safeMaxMonth) * chartWidth * p, 1)
       let y = chartTop + CGFloat(index) * taskHeight
-      // Bars are driven by `tasks`; a shorter/longer `taskColors` can never add or
-      // drop a bar. Bounds-check the color and fall back to the theme palette.
-      let color = data.taskColors.indices.contains(index) ? data.taskColors[index] : theme.color(at: index)
+      // Each bar takes its own color; fall back to the theme palette when unset.
+      let color = task.color ?? theme.color(at: index)
       let barHeight = max(taskHeight * 0.8, 1)
       let rect = CGRect(x: startX, y: y + taskHeight * 0.1, width: width, height: barHeight)
       let bar = Path(roundedRect: rect, cornerRadius: min(6, barHeight / 2))
@@ -136,8 +126,8 @@ public struct GanttChartRenderer: ChartRenderer {
     // Distinct integer months spanned by the tasks, plus 0 and the max month.
     var months = Set<Int>()
     for task in tasks {
-      let start = Int(task.startMonth)
-      let end = Int(task.startMonth + task.duration)
+      let start = task.startMonth
+      let end = task.startMonth + task.duration
       if start <= end { months.formUnion(start...end) }
     }
     months.insert(0)
@@ -162,17 +152,17 @@ public struct GanttChartRenderer: ChartRenderer {
 
 /// A horizontal Gantt timeline with rounded task bars and an animated reveal.
 public struct GanttChart: View {
-  public let data: GanttChartData
+  public let tasks: [GanttTask]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: GanttChartData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(tasks: [GanttTask], animate: Bool = true, replay: Int = 0) {
+    self.tasks = tasks
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: GanttChartRenderer(data: data), animate: animate, duration: 2.0, replay: replay)
+    ChartCanvas(renderer: GanttChartRenderer(tasks: tasks), animate: animate, duration: 2.0, replay: replay)
   }
 }

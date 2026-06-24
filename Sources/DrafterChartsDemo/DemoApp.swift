@@ -56,72 +56,72 @@ struct ContentView: View {
   private func galleryCardsLines(replay: Int) -> some View {
     Group {
       ChartCard(title: "Area Chart") {
-        AreaChart(data: AreaChartData(labels: SampleData.months, values: [12, 18, 9, 24, 20, 30]), replay: replay)
+        AreaChart(points: zip(SampleData.months, [12, 18, 9, 24, 20, 30]).map { ChartPoint($0, $1) }, color: SampleData.p[0], replay: replay)
       }
       ChartCard(title: "Line Chart") {
-        LineChart(data: SimpleLineChartData(labels: SampleData.months, values: [40, 65, 50, 80, 70, 95]), replay: replay)
+        LineChart(points: zip(SampleData.months, [40, 65, 50, 80, 70, 95]).map { ChartPoint($0, $1) }, color: SampleData.p[0], replay: replay)
       }
       ChartCard(title: "Grouped Line Chart") {
+        // Old groupedValues were one row per x-index; the new series transposes to one array per series.
+        let gv: [[Float]] = [[30, 20], [45, 35], [40, 50], [70, 45], [60, 65], [85, 55]]
         GroupedLineChart(
-          data: GroupedLineChartData(
-            labels: SampleData.months,
-            itemNames: ["A", "B"],
-            groupedValues: [[30, 20], [45, 35], [40, 50], [70, 45], [60, 65], [85, 55]],
-            colors: [SampleData.p[0], SampleData.p[1]]
-          ),
+          series: [
+            ChartSeries(name: "A", color: SampleData.p[0], values: gv.map { $0[0] }),
+            ChartSeries(name: "B", color: SampleData.p[1], values: gv.map { $0[1] }),
+          ],
+          categories: SampleData.months,
           replay: replay
         )
       }
       ChartCard(title: "Stacked Line Chart") {
+        // Transpose stacks: one series per level k.
+        let st: [[Float]] = [[10, 8], [14, 10], [12, 14], [20, 12], [18, 16], [24, 14]]
         StackedLineChart(
-          data: StackedLineChartData(
-            labels: SampleData.months,
-            stacks: [[10, 8], [14, 10], [12, 14], [20, 12], [18, 16], [24, 14]],
-            colors: [SampleData.p[2], SampleData.p[4]]
-          ),
+          series: [
+            ChartSeries(color: SampleData.p[2], values: st.map { $0[0] }),
+            ChartSeries(color: SampleData.p[4], values: st.map { $0[1] }),
+          ],
+          categories: SampleData.months,
           replay: replay
         )
       }
       ChartCard(title: "Simple Bar Chart") {
-        SimpleBarChart(data: SimpleBarChartData(labels: SampleData.quarters, values: [24, 38, 30, 46]), replay: replay)
+        SimpleBarChart(bars: zip(SampleData.quarters, [24, 38, 30, 46]).map { BarItem($0, $1) }, replay: replay)
       }
       ChartCard(title: "Grouped Bar Chart") {
+        // Transpose groupedValues to one series per item; assign a palette color per series.
+        let gv: [[Float]] = [[20, 28], [34, 30], [26, 38], [40, 44]]
         GroupedBarChart(
-          data: GroupedBarChartData(
-            labels: SampleData.quarters,
-            itemNames: ["2023", "2024"],
-            groupedValues: [[20, 28], [34, 30], [26, 38], [40, 44]]
-          ),
+          series: [
+            ChartSeries(name: "2023", color: SampleData.p[0], values: gv.map { $0[0] }),
+            ChartSeries(name: "2024", color: SampleData.p[1], values: gv.map { $0[1] }),
+          ],
+          categories: SampleData.quarters,
           replay: replay
         )
       }
       ChartCard(title: "Stacked Bar Chart") {
+        // Transpose stacks: one series per level k, palette color per level.
+        let st: [[Float]] = [[12, 8, 6], [16, 10, 8], [14, 12, 10], [20, 14, 9]]
         StackedBarChart(
-          data: StackedBarChartData(
-            labels: SampleData.quarters,
-            stacks: [[12, 8, 6], [16, 10, 8], [14, 12, 10], [20, 14, 9]]
-          ),
+          series: [
+            ChartSeries(color: SampleData.p[0], values: st.map { $0[0] }),
+            ChartSeries(color: SampleData.p[1], values: st.map { $0[1] }),
+            ChartSeries(color: SampleData.p[2], values: st.map { $0[2] }),
+          ],
+          categories: SampleData.quarters,
           replay: replay
         )
       }
       ChartCard(title: "Histogram") {
-        Histogram(
-          data: HistogramData(
-            dataPoints: [2, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 12, 13, 15],
-            binCount: 5
-          ),
-          replay: replay
-        )
+        Histogram(values: [2, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7, 8, 9, 10, 11, 12, 12, 13, 15], binCount: 5, replay: replay)
       }
       ChartCard(title: "Waterfall Chart") {
         WaterfallChart(
-          data: WaterfallChartData(
-            labels: ["Start", "Sales", "Costs", "Tax", "Net"],
-            values: [60, -25, -10],
-            initialValue: 50,
-            showInitialBar: true,
-            showTotalBar: true
-          ),
+          steps: [WaterfallStep("Sales", 60), WaterfallStep("Costs", -25), WaterfallStep("Tax", -10)],
+          initialValue: 50,
+          startLabel: "Start",
+          totalLabel: "Net",
           replay: replay
         )
       }
@@ -145,16 +145,16 @@ struct ContentView: View {
       }
       ChartCard(title: "Radar Chart") {
         RadarChart(
-          data: [
-            RadarChartData(values: ["Speed": 0.8, "Power": 0.6, "Range": 0.9, "Agility": 0.5, "Armor": 0.7]),
-            RadarChartData(values: ["Speed": 0.5, "Power": 0.9, "Range": 0.6, "Agility": 0.8, "Armor": 0.4]),
+          series: [
+            RadarSeries(color: SampleData.p[0], values: ["Speed": 0.8, "Power": 0.6, "Range": 0.9, "Agility": 0.5, "Armor": 0.7]),
+            RadarSeries(color: SampleData.p[1], values: ["Speed": 0.5, "Power": 0.9, "Range": 0.6, "Agility": 0.8, "Armor": 0.4]),
           ],
           replay: replay
         )
       }
       ChartCard(title: "Scatter Plot") {
         ScatterPlot(
-          data: ScatterPlotData(points: [(1, 2), (2, 5), (3, 3), (4, 8), (5, 6), (6, 9), (7, 7)], pointColors: SampleData.p),
+          points: [(1, 2), (2, 5), (3, 3), (4, 8), (5, 6), (6, 9), (7, 7)].map { ScatterPoint(x: $0.0, y: $0.1) },
           replay: replay
         )
       }
@@ -189,14 +189,12 @@ struct ContentView: View {
       }
       ChartCard(title: "Stream Graph Chart") {
         StreamGraphChart(
-          data: StreamData(
-            labels: SampleData.months,
-            series: [
-              StreamSeries(name: "A", values: [4, 6, 8, 7, 9, 6], color: SampleData.p[0]),
-              StreamSeries(name: "B", values: [3, 4, 6, 8, 7, 9], color: SampleData.p[1]),
-              StreamSeries(name: "C", values: [2, 3, 4, 5, 6, 7], color: SampleData.p[4]),
-            ]
-          ),
+          series: [
+            ChartSeries(name: "A", color: SampleData.p[0], values: [4, 6, 8, 7, 9, 6]),
+            ChartSeries(name: "B", color: SampleData.p[1], values: [3, 4, 6, 8, 7, 9]),
+            ChartSeries(name: "C", color: SampleData.p[4], values: [2, 3, 4, 5, 6, 7]),
+          ],
+          categories: SampleData.months,
           replay: replay
         )
       }
@@ -256,21 +254,19 @@ struct ContentView: View {
         )
       }
       ChartCard(title: "Gantt Chart") {
+        // Each task now carries its own color folded in; startMonth/duration are Int.
         GanttChart(
-          data: GanttChartData(
-            tasks: [
-              GanttTask(name: "Design", startMonth: 0, duration: 2),
-              GanttTask(name: "Build", startMonth: 2, duration: 3),
-              GanttTask(name: "Test", startMonth: 4, duration: 2),
-              GanttTask(name: "Ship", startMonth: 6, duration: 1),
-            ],
-            taskColors: [SampleData.p[0], SampleData.p[1], SampleData.p[2], SampleData.p[4]]
-          ),
+          tasks: [
+            GanttTask(name: "Design", startMonth: 0, duration: 2, color: SampleData.p[0]),
+            GanttTask(name: "Build", startMonth: 2, duration: 3, color: SampleData.p[1]),
+            GanttTask(name: "Test", startMonth: 4, duration: 2, color: SampleData.p[2]),
+            GanttTask(name: "Ship", startMonth: 6, duration: 1, color: SampleData.p[4]),
+          ],
           replay: replay
         )
       }
       ChartCard(title: "Step Line Chart") {
-        StepLineChart(data: StepLineChartData(labels: SampleData.months, values: [10, 10, 25, 18, 32, 28]), replay: replay)
+        StepLineChart(points: zip(SampleData.months, [10, 10, 25, 18, 32, 28]).map { ChartPoint($0, $1) }, replay: replay)
       }
       ChartCard(title: "Heatmap") {
         Heatmap(data: SampleData.heatmapData, replay: replay)

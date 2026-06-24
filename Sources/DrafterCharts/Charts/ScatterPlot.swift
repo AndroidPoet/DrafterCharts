@@ -3,49 +3,21 @@
 //  DrafterCharts
 //
 //  Cartesian scatter plot: an origin-bottom-left coordinate system with axis
-//  lines, value labels at each distinct x/y, and filled dots whose radius scales
-//  up with the reveal progress. Each dot carries a soft translucent halo and a
-//  crisp white ring for a premium, glassy feel. Mirrors the Compose
-//  `ScatterPlot` / `SimpleScatterPlotRenderer` geometry and animation.
+//  lines, value labels at each tick, and filled dots whose radius scales up with
+//  the reveal progress. Each dot carries a soft translucent halo and a crisp
+//  white ring for a premium, glassy feel. Consumes an array of `ScatterPoint`
+//  (x, y, plus an optional per-point color), so a color can never index past its
+//  data. Mirrors the Compose `ScatterPlot` / `SimpleScatterPlotRenderer`.
 //
 
 import SwiftUI
 
-/// Data for a `ScatterPlot`: cartesian `points` (x, y) and a parallel list of
-/// `pointColors` indexed per point (falls back to the theme palette when a color is missing).
-public struct ScatterPlotData: Equatable, Sendable {
-  public var points: [Point]
-  public var pointColors: [Color]
-
-  /// A single (x, y) sample. Equatable/Sendable stand-in for a tuple in a stored property.
-  public struct Point: Equatable, Sendable {
-    public var x: Float
-    public var y: Float
-    public init(_ x: Float, _ y: Float) {
-      self.x = x
-      self.y = y
-    }
-  }
-
-  public init(points: [Point], pointColors: [Color] = [.black]) {
-    self.points = points
-    self.pointColors = pointColors
-  }
-
-  /// Convenience initializer accepting raw `(Float, Float)` tuples.
-  public init(points: [(Float, Float)], pointColors: [Color] = [.black]) {
-    self.points = points.map { Point($0.0, $0.1) }
-    self.pointColors = pointColors
-  }
-}
-
-/// Draws a `ScatterPlotData` into a canvas using a bottom-left origin.
+/// Draws `[ScatterPoint]` into a canvas using a bottom-left origin.
 public struct ScatterPlotRenderer: ChartRenderer {
-  public let data: ScatterPlotData
-  public init(data: ScatterPlotData) { self.data = data }
+  public let points: [ScatterPoint]
+  public init(points: [ScatterPoint]) { self.points = points }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let points = data.points
     guard !points.isEmpty else { return }
 
     // 10% inset on every side, matching the Compose layout (0.8 plot area).
@@ -94,9 +66,9 @@ public struct ScatterPlotRenderer: ChartRenderer {
       let y = chartTop + chartHeight - (CGFloat(point.y) / maxY) * chartHeight
       let center = CGPoint(x: x, y: y)
 
-      // Point count is driven by `points`; color is bounds-checked against the
-      // parallel `pointColors`, falling back to the theme palette when missing.
-      let color = data.pointColors.indices.contains(index) ? data.pointColors[index] : theme.color(at: index)
+      // Each point's color travels with it; fall back to the theme palette by
+      // position when none is given, so a color can never bind to the wrong dot.
+      let color = point.color ?? theme.color(at: index)
 
       // Soft translucent halo.
       context.fill(circlePath(center: center, radius: pointSize * 2), with: .color(color.opacity(0.16 * Double(p))))
@@ -120,17 +92,17 @@ public struct ScatterPlotRenderer: ChartRenderer {
 
 /// A cartesian scatter plot with axis labels and dots that scale in on reveal.
 public struct ScatterPlot: View {
-  public let data: ScatterPlotData
+  public let points: [ScatterPoint]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: ScatterPlotData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(points: [ScatterPoint], animate: Bool = true, replay: Int = 0) {
+    self.points = points
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: ScatterPlotRenderer(data: data), animate: animate, duration: 2.0, replay: replay)
+    ChartCanvas(renderer: ScatterPlotRenderer(points: points), animate: animate, duration: 2.0, replay: replay)
   }
 }
