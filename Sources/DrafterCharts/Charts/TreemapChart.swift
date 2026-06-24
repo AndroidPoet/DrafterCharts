@@ -28,16 +28,6 @@ public struct TreemapItem: Equatable, Sendable {
   }
 }
 
-/// Data for a `TreemapChart`: the tiles to lay out. Tiles are area-proportional
-/// to `value`; non-positive values are dropped before layout.
-public struct TreemapData: Equatable, Sendable {
-  public var items: [TreemapItem]
-
-  public init(items: [TreemapItem]) {
-    self.items = items
-  }
-}
-
 // MARK: - Layout
 
 /// A laid-out tile: the source item plus the pixel rectangle it occupies.
@@ -46,10 +36,10 @@ private struct TreemapTile {
   let rect: CGRect
 }
 
-/// Draws a `TreemapData` into a canvas using the squarify layout algorithm.
+/// Draws treemap tiles into a canvas using the squarify layout algorithm.
 public struct TreemapChartRenderer: ChartRenderer {
-  public let data: TreemapData
-  public init(data: TreemapData) { self.data = data }
+  public let items: [TreemapItem]
+  public init(items: [TreemapItem]) { self.items = items }
 
   private static let gap: CGFloat = 4
   private static let corner: CGFloat = 8
@@ -57,7 +47,7 @@ public struct TreemapChartRenderer: ChartRenderer {
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
     guard size.width > 0, size.height > 0 else { return }
 
-    let sorted = data.items
+    let sorted = items
       .filter { $0.value > 0 }
       .sorted { $0.value > $1.value }
     guard !sorted.isEmpty else { return }
@@ -86,6 +76,11 @@ public struct TreemapChartRenderer: ChartRenderer {
         progress: progress
       )
     }
+  }
+
+  public var accessibilityLabel: String { "Treemap" }
+  public var accessibilityValue: String {
+    items.isEmpty ? "No data" : "\(items.count) items, \(AccessibilityFormat.points(items.map { ($0.label, $0.value) }))"
   }
 
   /// Slice-and-dice / squarify layout. Recursively peels a "row" of the largest
@@ -265,17 +260,17 @@ public struct TreemapChartRenderer: ChartRenderer {
 /// A squarified treemap with rounded, gradient tiles and a staggered
 /// scale-from-center reveal.
 public struct TreemapChart: View {
-  public let data: TreemapData
+  public let items: [TreemapItem]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: TreemapData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(items: [TreemapItem], animate: Bool = true, replay: Int = 0) {
+    self.items = items
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: TreemapChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: TreemapChartRenderer(items: items), animate: animate, duration: 0.9, replay: replay)
   }
 }

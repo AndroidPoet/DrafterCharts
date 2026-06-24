@@ -36,6 +36,8 @@
 - 🎬 Built-in left-to-right reveal animation with a one-line `replay` hook
 - 🚀 Pure SwiftUI `Canvas`, **zero dependencies**, no UIKit/AppKit bridging
 - 📱 Value-type data models and an `@Environment`-based theme
+- ♿️ **VoiceOver built in** — every chart announces its kind and a data summary, so a `Canvas` is never silently invisible to assistive technology
+- 🧩 **One consistent, type-safe API** — every chart takes its bound elements directly (`points:`, `series:`, `bars:`, `slices:`, `nodes:`…), so a label can't desync from its value and there's no `data:` wrapper to learn
 
 ## Installation
 
@@ -52,7 +54,7 @@ https://github.com/AndroidPoet/DrafterCharts.git
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/AndroidPoet/DrafterCharts.git", from: "0.1.0")
+  .package(url: "https://github.com/AndroidPoet/DrafterCharts.git", from: "0.2.0")
 ],
 targets: [
   .target(name: "MyApp", dependencies: [
@@ -80,7 +82,7 @@ AreaChart(points: areaPoints, replay: replayKey)  // bump replayKey to re-run
 
 Size charts like any SwiftUI view with `.frame(...)`, and set the palette/light-dark with `.drafterTheme(...)`.
 
-For the simplest single-series charts there are **values-first** convenience initializers, so trivial cases can skip the data struct:
+For the simplest single-series charts there are **values-first** convenience initializers, so trivial cases can skip building labeled elements:
 
 ```swift
 LineChart(values: [40, 65, 50, 80, 70, 95])
@@ -261,15 +263,15 @@ StepLineChart(
 ## Pie & Donut Chart
 
 ```swift
-let pie = PieChartData(slices: [
-  .init(value: 40, color: DrafterColors.blue,   label: "Blue"),
-  .init(value: 30, color: DrafterColors.teal,   label: "Teal"),
-  .init(value: 20, color: DrafterColors.violet, label: "Violet"),
-  .init(value: 10, color: DrafterColors.amber,  label: "Amber"),
-])
+let slices = [
+  PieSlice(value: 40, color: DrafterColors.blue,   label: "Blue"),
+  PieSlice(value: 30, color: DrafterColors.teal,   label: "Teal"),
+  PieSlice(value: 20, color: DrafterColors.violet, label: "Violet"),
+  PieSlice(value: 10, color: DrafterColors.amber,  label: "Amber"),
+]
 
-PieChart(data: pie).frame(width: 240, height: 240)
-DonutChart(data: pie).frame(width: 240, height: 240)
+PieChart(slices: slices).frame(width: 240, height: 240)
+DonutChart(slices: slices).frame(width: 240, height: 240)
 ```
 
 ## Scatter Plot Chart
@@ -289,12 +291,12 @@ ScatterPlot(
 
 ```swift
 BubbleChart(
-  data: BubbleChartData(series: [
-    [ .init(x: 10, y: 26, size: 30, color: DrafterColors.blue),
-      .init(x: 26, y: 30, size: 60, color: DrafterColors.blue) ],
-    [ .init(x: 14, y: 15, size: 30, color: DrafterColors.teal),
-      .init(x: 22, y: 36, size: 45, color: DrafterColors.teal) ],
-  ])
+  series: [
+    [ BubbleData(x: 10, y: 26, size: 30, color: DrafterColors.blue),
+      BubbleData(x: 26, y: 30, size: 60, color: DrafterColors.blue) ],
+    [ BubbleData(x: 14, y: 15, size: 30, color: DrafterColors.teal),
+      BubbleData(x: 22, y: 36, size: 45, color: DrafterColors.teal) ],
+  ]
 )
 .frame(height: 300)
 ```
@@ -303,15 +305,13 @@ BubbleChart(
 
 ```swift
 CandlestickChart(
-  data: CandlestickData(
-    candles: [
-      Candle(label: "1", open: 20, high: 30, low: 16, close: 26),
-      Candle(label: "2", open: 26, high: 32, low: 22, close: 23),
-      Candle(label: "3", open: 23, high: 28, low: 18, close: 27),
-      Candle(label: "4", open: 27, high: 38, low: 25, close: 35),
-    ],
-    movingAverages: [MovingAverage(period: 3, color: DrafterColors.amber)]
-  )
+  candles: [
+    Candle(label: "1", open: 20, high: 30, low: 16, close: 26),
+    Candle(label: "2", open: 26, high: 32, low: 22, close: 23),
+    Candle(label: "3", open: 23, high: 28, low: 18, close: 27),
+    Candle(label: "4", open: 27, high: 38, low: 25, close: 35),
+  ],
+  movingAverages: [MovingAverage(period: 3, color: DrafterColors.amber)]
 )
 .frame(height: 300)
 ```
@@ -320,11 +320,11 @@ CandlestickChart(
 
 ```swift
 BoxPlotChart(
-  data: BoxPlotData(groups: [
+  groups: [
     BoxGroup(label: "A", min: 5,  q1: 18, median: 28, q3: 38, max: 52, color: DrafterColors.violet),
     BoxGroup(label: "B", min: 10, q1: 22, median: 30, q3: 41, max: 48, color: DrafterColors.blue),
     BoxGroup(label: "C", min: 8,  q1: 15, median: 24, q3: 33, max: 44, color: DrafterColors.teal),
-  ])
+  ]
 )
 .frame(height: 300)
 ```
@@ -344,20 +344,18 @@ RadarChart(
 ## Gauge Chart
 
 ```swift
-GaugeChart(
-  data: GaugeData(value: 72, min: 0, max: 100, label: "Score", color: DrafterColors.teal)
-)
-.frame(height: 300)
+GaugeChart(value: 72, min: 0, max: 100, label: "Score", color: DrafterColors.teal)
+  .frame(height: 300)
 ```
 
 ## Bullet Chart
 
 ```swift
 BulletChart(
-  data: BulletData(metrics: [
+  metrics: [
     BulletMetric(label: "Revenue", value: 72, target: 80, ranges: [40, 65, 100], color: DrafterColors.blue),
     BulletMetric(label: "Profit",  value: 55, target: 50, ranges: [30, 60, 90],  color: DrafterColors.teal),
-  ])
+  ]
 )
 .frame(height: 300)
 ```
@@ -366,12 +364,12 @@ BulletChart(
 
 ```swift
 FunnelChart(
-  data: FunnelData(stages: [
+  stages: [
     FunnelStage(label: "Visits",  value: 100, color: DrafterColors.blue),
     FunnelStage(label: "Signups", value: 64,  color: DrafterColors.teal),
     FunnelStage(label: "Trials",  value: 38,  color: DrafterColors.violet),
     FunnelStage(label: "Paid",    value: 18,  color: DrafterColors.amber),
-  ])
+  ]
 )
 .frame(height: 300)
 ```
@@ -380,12 +378,12 @@ FunnelChart(
 
 ```swift
 TreemapChart(
-  data: TreemapData(items: [
+  items: [
     TreemapItem(label: "Mobile",  value: 45, color: DrafterColors.blue),
     TreemapItem(label: "Desktop", value: 30, color: DrafterColors.teal),
     TreemapItem(label: "Tablet",  value: 15, color: DrafterColors.violet),
     TreemapItem(label: "Watch",   value: 8,  color: DrafterColors.amber),
-  ])
+  ]
 )
 .frame(height: 300)
 ```
@@ -394,12 +392,12 @@ TreemapChart(
 
 ```swift
 PolarAreaChart(
-  data: PolarAreaData(slices: [
+  slices: [
     PolarSlice(label: "N", value: 40, color: DrafterColors.blue),
     PolarSlice(label: "E", value: 35, color: DrafterColors.violet),
     PolarSlice(label: "S", value: 30, color: DrafterColors.green),
     PolarSlice(label: "W", value: 22, color: DrafterColors.amber),
-  ])
+  ]
 )
 .frame(width: 300, height: 300)
 ```
@@ -408,7 +406,7 @@ PolarAreaChart(
 
 ```swift
 SunburstChart(
-  data: SunburstData(roots: [
+  roots: [
     SunburstNode(label: "Web", value: 50, color: DrafterColors.blue, children: [
       SunburstNode(label: "HTML", value: 20, color: DrafterColors.blue),
       SunburstNode(label: "CSS",  value: 15, color: DrafterColors.blue),
@@ -418,7 +416,7 @@ SunburstChart(
       SunburstNode(label: "iOS",     value: 20, color: DrafterColors.teal),
       SunburstNode(label: "Android", value: 15, color: DrafterColors.teal),
     ]),
-  ])
+  ]
 )
 .frame(width: 300, height: 300)
 ```
@@ -427,21 +425,19 @@ SunburstChart(
 
 ```swift
 SankeyChart(
-  data: SankeyData(
-    nodes: [
-      SankeyNode(id: "a", label: "Source A", column: 0, color: DrafterColors.blue),
-      SankeyNode(id: "b", label: "Source B", column: 0, color: DrafterColors.teal),
-      SankeyNode(id: "m", label: "Hub",      column: 1, color: DrafterColors.violet),
-      SankeyNode(id: "x", label: "Out X",    column: 2, color: DrafterColors.amber),
-      SankeyNode(id: "y", label: "Out Y",    column: 2, color: DrafterColors.green),
-    ],
-    links: [
-      SankeyLink(from: "a", to: "m", value: 30),
-      SankeyLink(from: "b", to: "m", value: 20),
-      SankeyLink(from: "m", to: "x", value: 28),
-      SankeyLink(from: "m", to: "y", value: 22),
-    ]
-  )
+  nodes: [
+    SankeyNode(id: "a", label: "Source A", column: 0, color: DrafterColors.blue),
+    SankeyNode(id: "b", label: "Source B", column: 0, color: DrafterColors.teal),
+    SankeyNode(id: "m", label: "Hub",      column: 1, color: DrafterColors.violet),
+    SankeyNode(id: "x", label: "Out X",    column: 2, color: DrafterColors.amber),
+    SankeyNode(id: "y", label: "Out Y",    column: 2, color: DrafterColors.green),
+  ],
+  links: [
+    SankeyLink(from: "a", to: "m", value: 30),
+    SankeyLink(from: "b", to: "m", value: 20),
+    SankeyLink(from: "m", to: "x", value: 28),
+    SankeyLink(from: "m", to: "y", value: 22),
+  ]
 )
 .frame(height: 300)
 ```
@@ -481,7 +477,7 @@ let contributions: [ContributionData] = (0..<365).compactMap { day in
   return ContributionData(date: date, count: max(0, (day * 13 + day % 7 * 5) % 16 - 4))
 }
 
-Heatmap(data: ContributionHeatmapData(contributions: contributions))
+Heatmap(contributions: contributions)
   .frame(height: 120)
 ```
 
@@ -492,7 +488,7 @@ All charts read their palette and light/dark colors from a `DrafterThemeColors` 
 ```swift
 VStack {
   AreaChart(points: areaPoints)
-  PieChart(data: pieData)
+  PieChart(slices: pieSlices)
 }
 .drafterTheme(.dark)   // or .light, or a custom set:
 .drafterTheme(DrafterThemeColors(
@@ -505,6 +501,23 @@ VStack {
 ```
 
 Each chart's geometry lives in a pure `ChartRenderer` hosted by `ChartCanvas`, so the drawing is testable and the theming + reveal animation are centralized in one place.
+
+## Accessibility
+
+A `Canvas` is a single opaque drawing — by default VoiceOver skips right over it. DrafterCharts fixes this for you: `ChartCanvas` collapses each chart into one accessibility element and pulls its description from the renderer, so every chart announces **what it is** and **a summary of its data** with no extra work at the call site.
+
+```swift
+AreaChart(points: [ChartPoint("Jan", 40), ChartPoint("Feb", 65), ChartPoint("Mar", 30)])
+// VoiceOver: "Area chart, 3 points, Jan 40, Feb 65, Mar 30"
+
+GaugeChart(value: 72, min: 0, max: 100, label: "Score")
+// VoiceOver: "Gauge, Score 72 of 0 to 100"
+
+SankeyChart(nodes: nodes, links: links)
+// VoiceOver: "Sankey diagram, 5 nodes, 4 flows"
+```
+
+The label/value come from each `ChartRenderer`'s `accessibilityLabel` and `accessibilityValue`, so if you write a custom renderer you can describe it the same way.
 
 ## Demo
 

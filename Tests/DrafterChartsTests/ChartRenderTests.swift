@@ -118,7 +118,7 @@ final class ChartRenderTests: XCTestCase {
 
   func testBulletChartRenders() throws {
     let chart = BulletChart(
-      data: BulletData(metrics: [BulletMetric(label: "Revenue", value: 78, target: 85, ranges: [50, 75, 100])]),
+      metrics: [BulletMetric(label: "Revenue", value: 78, target: 85, ranges: [50, 75, 100])],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "BulletChart")
@@ -138,22 +138,22 @@ final class ChartRenderTests: XCTestCase {
   // MARK: - Part-to-whole & radial
 
   func testPieChartRenders() throws {
-    let chart = PieChart(data: pieData, animate: false)
+    let chart = PieChart(slices: pieData, animate: false)
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "PieChart")
   }
 
   func testDonutChartRenders() throws {
-    let chart = DonutChart(data: pieData, animate: false)
+    let chart = DonutChart(slices: pieData, animate: false)
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "DonutChart")
   }
 
   func testPolarAreaChartRenders() throws {
     let chart = PolarAreaChart(
-      data: PolarAreaData(slices: [
+      slices: [
         PolarSlice(label: "Mon", value: 8, color: palette[0]),
         PolarSlice(label: "Tue", value: 12, color: palette[1]),
         PolarSlice(label: "Wed", value: 6, color: palette[2]),
-      ]),
+      ],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "PolarAreaChart")
@@ -161,13 +161,13 @@ final class ChartRenderTests: XCTestCase {
 
   func testSunburstChartRenders() throws {
     let chart = SunburstChart(
-      data: SunburstData(roots: [
+      roots: [
         SunburstNode(label: "Web", value: 50, color: palette[0], children: [
           SunburstNode(label: "iOS", value: 30, color: palette[0]),
           SunburstNode(label: "And", value: 20, color: palette[0]),
         ]),
         SunburstNode(label: "API", value: 30, color: palette[1], children: []),
-      ]),
+      ],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "SunburstChart")
@@ -175,11 +175,11 @@ final class ChartRenderTests: XCTestCase {
 
   func testFunnelChartRenders() throws {
     let chart = FunnelChart(
-      data: FunnelData(stages: [
+      stages: [
         FunnelStage(label: "Visits", value: 1000, color: palette[0]),
         FunnelStage(label: "Signups", value: 620, color: palette[1]),
         FunnelStage(label: "Paid", value: 120, color: palette[4]),
-      ]),
+      ],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "FunnelChart")
@@ -187,11 +187,11 @@ final class ChartRenderTests: XCTestCase {
 
   func testTreemapChartRenders() throws {
     let chart = TreemapChart(
-      data: TreemapData(items: [
+      items: [
         TreemapItem(label: "Alpha", value: 40, color: palette[0]),
         TreemapItem(label: "Beta", value: 25, color: palette[1]),
         TreemapItem(label: "Gamma", value: 18, color: palette[2]),
-      ]),
+      ],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "TreemapChart")
@@ -206,7 +206,7 @@ final class ChartRenderTests: XCTestCase {
   }
 
   func testGaugeChartRenders() throws {
-    let chart = GaugeChart(data: GaugeData(value: 72, min: 0, max: 100, label: "Score"), animate: false)
+    let chart = GaugeChart(value: 72, min: 0, max: 100, label: "Score", animate: false)
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "GaugeChart")
   }
 
@@ -225,11 +225,11 @@ final class ChartRenderTests: XCTestCase {
 
   func testBubbleChartRenders() throws {
     let chart = BubbleChart(
-      data: BubbleChartData(series: [[
+      series: [[
         BubbleData(x: 10, y: 20, size: 3, color: palette[0]),
         BubbleData(x: 50, y: 25, size: 5, color: palette[2]),
         BubbleData(x: 70, y: 60, size: 8, color: palette[4]),
-      ]]),
+      ]],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "BubbleChart")
@@ -237,10 +237,10 @@ final class ChartRenderTests: XCTestCase {
 
   func testBoxPlotChartRenders() throws {
     let chart = BoxPlotChart(
-      data: BoxPlotData(groups: [
+      groups: [
         BoxGroup(label: "A", min: 5, q1: 12, median: 18, q3: 24, max: 30),
         BoxGroup(label: "B", min: 8, q1: 15, median: 22, q3: 28, max: 38, color: palette[1]),
-      ]),
+      ],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "BoxPlotChart")
@@ -248,14 +248,12 @@ final class ChartRenderTests: XCTestCase {
 
   func testCandlestickChartRenders() throws {
     let chart = CandlestickChart(
-      data: CandlestickData(
-        candles: [
-          Candle(label: "1", open: 20, high: 26, low: 18, close: 24),
-          Candle(label: "2", open: 24, high: 28, low: 22, close: 21),
-          Candle(label: "3", open: 21, high: 25, low: 19, close: 23),
-        ],
-        movingAverages: [MovingAverage(period: 2, color: palette[3])]
-      ),
+      candles: [
+        Candle(label: "1", open: 20, high: 26, low: 18, close: 24),
+        Candle(label: "2", open: 24, high: 28, low: 22, close: 21),
+        Candle(label: "3", open: 21, high: 25, low: 19, close: 23),
+      ],
+      movingAverages: [MovingAverage(period: 2, color: palette[3])],
       animate: false
     )
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "CandlestickChart")
@@ -270,14 +268,14 @@ final class ChartRenderTests: XCTestCase {
       guard let date = calendar.date(byAdding: .day, value: day, to: start) else { continue }
       contributions.append(ContributionData(date: date, count: (day * 7) % 12))
     }
-    let chart = Heatmap(data: ContributionHeatmapData(contributions: contributions), animate: false)
+    let chart = Heatmap(contributions: contributions, animate: false)
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "Heatmap")
   }
 
   // MARK: - Sankey (regression: flow bands must render)
 
   func testSankeyChartRenders() throws {
-    let chart = SankeyChart(data: sankeyData, animate: false)
+    let chart = SankeyChart(nodes: sankeyNodes, links: sankeyLinks, animate: false)
     assertNotBlank(try RenderHarness.bitmap(chart, size: size), "SankeyChart")
   }
 
@@ -287,7 +285,7 @@ final class ChartRenderTests: XCTestCase {
   /// column 1.
   func testSankeyDrawsFlowBandsBetweenColumns() throws {
     let renderSize = CGSize(width: 400, height: 300)
-    let bitmap = try RenderHarness.bitmap(SankeyChart(data: sankeyData, animate: false), size: renderSize)
+    let bitmap = try RenderHarness.bitmap(SankeyChart(nodes: sankeyNodes, links: sankeyLinks, animate: false), size: renderSize)
 
     let gap = CGRect(
       x: renderSize.width * 0.18,
@@ -304,29 +302,30 @@ final class ChartRenderTests: XCTestCase {
 
   // MARK: - Shared fixtures
 
-  private var pieData: PieChartData {
-    PieChartData(slices: [
-      PieChartData.Slice(value: 40, color: palette[0], label: "A"),
-      PieChartData.Slice(value: 25, color: palette[1], label: "B"),
-      PieChartData.Slice(value: 20, color: palette[2], label: "C"),
-      PieChartData.Slice(value: 15, color: palette[4], label: "D"),
-    ])
+  private var pieData: [PieSlice] {
+    [
+      PieSlice(value: 40, color: palette[0], label: "A"),
+      PieSlice(value: 25, color: palette[1], label: "B"),
+      PieSlice(value: 20, color: palette[2], label: "C"),
+      PieSlice(value: 15, color: palette[4], label: "D"),
+    ]
   }
 
-  private var sankeyData: SankeyData {
-    SankeyData(
-      nodes: [
-        SankeyNode(id: "src", label: "Source", column: 0, color: palette[0]),
-        SankeyNode(id: "a", label: "A", column: 1, color: palette[1]),
-        SankeyNode(id: "b", label: "B", column: 1, color: palette[2]),
-        SankeyNode(id: "out", label: "Out", column: 2, color: palette[4]),
-      ],
-      links: [
-        SankeyLink(from: "src", to: "a", value: 30),
-        SankeyLink(from: "src", to: "b", value: 20),
-        SankeyLink(from: "a", to: "out", value: 30),
-        SankeyLink(from: "b", to: "out", value: 20),
-      ]
-    )
+  private var sankeyNodes: [SankeyNode] {
+    [
+      SankeyNode(id: "src", label: "Source", column: 0, color: palette[0]),
+      SankeyNode(id: "a", label: "A", column: 1, color: palette[1]),
+      SankeyNode(id: "b", label: "B", column: 1, color: palette[2]),
+      SankeyNode(id: "out", label: "Out", column: 2, color: palette[4]),
+    ]
+  }
+
+  private var sankeyLinks: [SankeyLink] {
+    [
+      SankeyLink(from: "src", to: "a", value: 30),
+      SankeyLink(from: "src", to: "b", value: 20),
+      SankeyLink(from: "a", to: "out", value: 30),
+      SankeyLink(from: "b", to: "out", value: 20),
+    ]
   }
 }

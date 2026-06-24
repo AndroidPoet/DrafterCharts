@@ -182,6 +182,11 @@ public struct SimpleBarChartRenderer: ChartRenderer {
     drawBarChart(Variant(bars: bars, theme: theme), in: &context, size: size, theme: theme, progress: progress)
   }
 
+  public var accessibilityLabel: String { "Bar chart" }
+  public var accessibilityValue: String {
+    bars.isEmpty ? "No data" : "\(bars.count) bars, \(AccessibilityFormat.points(bars.map { ($0.label, $0.value) }))"
+  }
+
   private struct Variant: BarVariant {
     let bars: [BarItem]
     let theme: DrafterThemeColors
@@ -255,6 +260,14 @@ public struct GroupedBarChartRenderer: ChartRenderer {
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
     drawBarChart(Variant(series: series, categories: categories, theme: theme), in: &context, size: size, theme: theme, progress: progress)
+  }
+
+  public var accessibilityLabel: String { "Grouped bar chart" }
+  public var accessibilityValue: String {
+    guard !series.isEmpty else { return "No data" }
+    return "\(series.count) series: " + series.map {
+      "\($0.name.isEmpty ? "series" : $0.name) \(AccessibilityFormat.range($0.values))"
+    }.joined(separator: "; ")
   }
 
   private struct Variant: BarVariant {
@@ -334,6 +347,14 @@ public struct StackedBarChartRenderer: ChartRenderer {
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
     drawBarChart(Variant(series: series, categories: categories, theme: theme), in: &context, size: size, theme: theme, progress: progress)
+  }
+
+  public var accessibilityLabel: String { "Stacked bar chart" }
+  public var accessibilityValue: String {
+    guard !series.isEmpty else { return "No data" }
+    return "\(series.count) series: " + series.map {
+      "\($0.name.isEmpty ? "series" : $0.name) \(AccessibilityFormat.range($0.values))"
+    }.joined(separator: "; ")
   }
 
   private struct Variant: BarVariant {
@@ -449,6 +470,11 @@ public struct HistogramRenderer: ChartRenderer {
     )
   }
 
+  public var accessibilityLabel: String { "Histogram" }
+  public var accessibilityValue: String {
+    values.isEmpty ? "No data" : "\(values.count) values, \(AccessibilityFormat.range(values))"
+  }
+
   private struct Variant: BarVariant {
     let labels: [String]
     let frequencies: [Float]
@@ -558,6 +584,15 @@ public struct WaterfallChartRenderer: ChartRenderer {
     let columns = buildColumns()
     guard !columns.isEmpty else { return }
     drawBarChart(Variant(columns: columns, theme: theme), in: &context, size: size, theme: theme, progress: progress)
+  }
+
+  public var accessibilityLabel: String { "Waterfall chart" }
+  public var accessibilityValue: String {
+    guard !steps.isEmpty else { return "No data" }
+    let total = initialValue + steps.reduce(0) { $0 + $1.value }
+    return "starting \(AccessibilityFormat.number(initialValue)), "
+      + AccessibilityFormat.points(steps.map { ($0.label, $0.value) })
+      + ", total \(AccessibilityFormat.number(total))"
   }
 
   private struct Variant: BarVariant {

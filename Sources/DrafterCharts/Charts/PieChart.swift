@@ -12,25 +12,16 @@
 
 import SwiftUI
 
-/// Data for a `PieChart` / `DonutChart`: a list of weighted, colored slices.
-public struct PieChartData: Equatable, Sendable {
-  /// One wedge of the pie: its weight, fill color, and a legend label.
-  public struct Slice: Equatable, Sendable {
-    public var value: Float
-    public var color: Color
-    public var label: String
+/// One wedge of a `PieChart` / `DonutChart`: its weight, fill color, and a legend label.
+public struct PieSlice: Equatable, Sendable {
+  public var value: Float
+  public var color: Color
+  public var label: String
 
-    public init(value: Float, color: Color, label: String) {
-      self.value = value
-      self.color = color
-      self.label = label
-    }
-  }
-
-  public var slices: [Slice]
-
-  public init(slices: [Slice]) {
-    self.slices = slices
+  public init(value: Float, color: Color, label: String) {
+    self.value = value
+    self.color = color
+    self.label = label
   }
 }
 
@@ -38,7 +29,7 @@ public struct PieChartData: Equatable, Sendable {
 
 /// The total of all slice values, floored at 1 so a single empty dataset can't
 /// divide by zero (matches the Compose `max(sum, 1f)`).
-private func pieTotal(_ slices: [PieChartData.Slice]) -> Float {
+private func pieTotal(_ slices: [PieSlice]) -> Float {
   max(slices.reduce(Float(0)) { $0 + $1.value }, 1)
 }
 
@@ -52,18 +43,17 @@ private func percentLabel(_ percent: Double, color: Color) -> Text {
 
 // MARK: - Pie
 
-/// Draws a `PieChartData` as solid wedges that meet at the center.
+/// Draws a list of `PieSlice`s as solid wedges that meet at the center.
 public struct PieChartRenderer: ChartRenderer {
-  public let data: PieChartData
+  public let slices: [PieSlice]
   public let labelThreshold: Float
 
-  public init(data: PieChartData, labelThreshold: Float = 5) {
-    self.data = data
+  public init(slices: [PieSlice], labelThreshold: Float = 5) {
+    self.slices = slices
     self.labelThreshold = labelThreshold
   }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let slices = data.slices
     guard !slices.isEmpty else { return }
 
     let total = pieTotal(slices)
@@ -105,41 +95,48 @@ public struct PieChartRenderer: ChartRenderer {
       startAngle += sweep
     }
   }
+
+  /// VoiceOver: names this as a pie chart.
+  public var accessibilityLabel: String { "Pie chart" }
+
+  /// VoiceOver: the slice count and each slice's label/value.
+  public var accessibilityValue: String {
+    slices.isEmpty ? "No data" : "\(slices.count) slices, \(AccessibilityFormat.points(slices.map { ($0.label, $0.value) }))"
+  }
 }
 
 /// A solid pie chart whose wedges sweep in proportionally on reveal.
 public struct PieChart: View {
-  public let data: PieChartData
+  public let slices: [PieSlice]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: PieChartData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(slices: [PieSlice], animate: Bool = true, replay: Int = 0) {
+    self.slices = slices
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: PieChartRenderer(data: data), animate: animate, duration: 1.0, replay: replay)
+    ChartCanvas(renderer: PieChartRenderer(slices: slices), animate: animate, duration: 1.0, replay: replay)
   }
 }
 
 // MARK: - Donut
 
-/// Draws a `PieChartData` as stroked arcs around a hollow center.
+/// Draws a list of `PieSlice`s as stroked arcs around a hollow center.
 public struct DonutChartRenderer: ChartRenderer {
-  public let data: PieChartData
+  public let slices: [PieSlice]
   public let labelThreshold: Float
   public let holeRadiusFraction: CGFloat
 
-  public init(data: PieChartData, labelThreshold: Float = 5, holeRadiusFraction: CGFloat = 0.5) {
-    self.data = data
+  public init(slices: [PieSlice], labelThreshold: Float = 5, holeRadiusFraction: CGFloat = 0.5) {
+    self.slices = slices
     self.labelThreshold = labelThreshold
     self.holeRadiusFraction = holeRadiusFraction
   }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let slices = data.slices
     guard !slices.isEmpty else { return }
 
     let total = pieTotal(slices)
@@ -183,21 +180,29 @@ public struct DonutChartRenderer: ChartRenderer {
       startAngle += sweep
     }
   }
+
+  /// VoiceOver: names this as a donut chart.
+  public var accessibilityLabel: String { "Donut chart" }
+
+  /// VoiceOver: the slice count and each slice's label/value.
+  public var accessibilityValue: String {
+    slices.isEmpty ? "No data" : "\(slices.count) slices, \(AccessibilityFormat.points(slices.map { ($0.label, $0.value) }))"
+  }
 }
 
 /// A donut chart: stroked arcs around a hollow center, sweeping in on reveal.
 public struct DonutChart: View {
-  public let data: PieChartData
+  public let slices: [PieSlice]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: PieChartData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(slices: [PieSlice], animate: Bool = true, replay: Int = 0) {
+    self.slices = slices
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: DonutChartRenderer(data: data), animate: animate, duration: 1.0, replay: replay)
+    ChartCanvas(renderer: DonutChartRenderer(slices: slices), animate: animate, duration: 1.0, replay: replay)
   }
 }

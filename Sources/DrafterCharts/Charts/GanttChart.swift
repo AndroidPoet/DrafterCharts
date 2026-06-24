@@ -83,6 +83,15 @@ public struct GanttChartRenderer: ChartRenderer {
     }
   }
 
+  public var accessibilityLabel: String { "Gantt chart" }
+  public var accessibilityValue: String {
+    guard !tasks.isEmpty else { return "No data" }
+    let limit = 12
+    let names = tasks.prefix(limit).map { $0.name.isEmpty ? "task" : $0.name }
+    let suffix = tasks.count > limit ? ", and \(tasks.count - limit) more" : ""
+    return "\(tasks.count) tasks: " + names.joined(separator: ", ") + suffix
+  }
+
   // MARK: - Axes & labels
 
   private func drawAxes(

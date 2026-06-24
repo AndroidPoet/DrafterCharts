@@ -10,14 +10,15 @@
 
 import SwiftUI
 
-/// Data for a `GaugeChart`: a `value` within `[min, max]`, an optional `label`,
-/// and the accent `color` used for the knob ring.
-public struct GaugeData: Equatable, Sendable {
-  public var value: Float
-  public var min: Float
-  public var max: Float
-  public var label: String
-  public var color: Color
+/// Draws a gauge into a canvas: static track arc + animated value arc.
+/// Holds a `value` within `[min, max]`, an optional `label`, and the accent
+/// `color` used for the knob ring.
+public struct GaugeChartRenderer: ChartRenderer {
+  public let value: Float
+  public let min: Float
+  public let max: Float
+  public let label: String
+  public let color: Color
 
   public init(
     value: Float,
@@ -32,12 +33,6 @@ public struct GaugeData: Equatable, Sendable {
     self.label = label
     self.color = color
   }
-}
-
-/// Draws a `GaugeData` into a canvas: static track arc + animated value arc.
-public struct GaugeChartRenderer: ChartRenderer {
-  public let data: GaugeData
-  public init(data: GaugeData) { self.data = data }
 
   // Compose arc geometry: 0° = +x, clockwise (y down). 240° sweep starting at 150°.
   private let startAngleDeg: Double = 150
@@ -65,8 +60,8 @@ public struct GaugeChartRenderer: ChartRenderer {
     context.stroke(track, with: .color(theme.grid), style: stroke)
 
     // Value fraction clamped to [0, 1], scaled by the reveal progress.
-    let span = (data.max - data.min) == 0 ? 1 : (data.max - data.min)
-    let rawFraction = clamp01(Double((data.value - data.min) / span))
+    let span = (max - min) == 0 ? 1 : (max - min)
+    let rawFraction = clamp01(Double((value - min) / span))
     let fraction = rawFraction * clamp01(progress)
     let valueSweep = sweepAngleDeg * fraction
 
@@ -80,7 +75,7 @@ public struct GaugeChartRenderer: ChartRenderer {
         clockwise: false
       )
       // Sweep gradient across the full palette for a premium multi-tone arc.
-      let palette = DrafterColors.palette + [DrafterColors.palette.first ?? data.color]
+      let palette = DrafterColors.palette + [DrafterColors.palette.first ?? color]
       let gradient = GraphicsContext.Shading.conicGradient(
         Gradient(colors: palette),
         center: center,
@@ -95,10 +90,10 @@ public struct GaugeChartRenderer: ChartRenderer {
     let knobRadius = strokeWidth * 0.42
     let knobRect = CGRect(x: tip.x - knobRadius, y: tip.y - knobRadius, width: knobRadius * 2, height: knobRadius * 2)
     context.fill(Path(ellipseIn: knobRect), with: .color(.white))
-    context.stroke(Path(ellipseIn: knobRect), with: .color(data.color), lineWidth: 2)
+    context.stroke(Path(ellipseIn: knobRect), with: .color(color), lineWidth: 2)
 
     // Center value (big) + optional label below it, vertically centered as a block.
-    let valueText = format(data.value)
+    let valueText = format(value)
     let valueFontSize = clamp(Double(radius) * 0.04, 20, 44)
     let valueColor: Color = theme.isDark ? .white : Color(hex: 0x1B1E25)
     let labelColor: Color = theme.isDark
@@ -110,12 +105,12 @@ public struct GaugeChartRenderer: ChartRenderer {
     )
     let valueMeasured = valueResolved.measure(in: size)
 
-    let hasLabel = !data.label.isEmpty
+    let hasLabel = !label.isEmpty
     var labelMeasured = CGSize.zero
     var labelResolved: GraphicsContext.ResolvedText?
     if hasLabel {
       let r = context.resolve(
-        Text(data.label).font(.system(size: 13)).foregroundColor(labelColor)
+        Text(label).font(.system(size: 13)).foregroundColor(labelColor)
       )
       labelResolved = r
       labelMeasured = r.measure(in: size)
@@ -140,13 +135,21 @@ public struct GaugeChartRenderer: ChartRenderer {
 
     // Min / max end labels just outside the arc ends.
     drawEndLabel(
-      in: &context, text: format(data.min), angleDeg: startAngleDeg,
+      in: &context, text: format(min), angleDeg: startAngleDeg,
       center: center, arcRadius: arcRadius, strokeWidth: strokeWidth, color: theme.label
     )
     drawEndLabel(
-      in: &context, text: format(data.max), angleDeg: startAngleDeg + sweepAngleDeg,
+      in: &context, text: format(max), angleDeg: startAngleDeg + sweepAngleDeg,
       center: center, arcRadius: arcRadius, strokeWidth: strokeWidth, color: theme.label
     )
+  }
+
+  /// VoiceOver: names this as a gauge.
+  public var accessibilityLabel: String { "Gauge" }
+
+  /// VoiceOver: the value and its position within the range.
+  public var accessibilityValue: String {
+    "\(label.isEmpty ? "value" : label) \(AccessibilityFormat.number(value)) of \(AccessibilityFormat.number(min)) to \(AccessibilityFormat.number(max))"
   }
 
   private func drawEndLabel(
@@ -179,17 +182,38 @@ public struct GaugeChartRenderer: ChartRenderer {
 /// A radial gauge with a static track, an animated value arc, a tip knob, and
 /// a centered value/label.
 public struct GaugeChart: View {
-  public let data: GaugeData
+  public let value: Float
+  public let min: Float
+  public let max: Float
+  public let label: String
+  public let color: Color
   public var animate: Bool
   public var replay: Int
 
-  public init(data: GaugeData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(
+    value: Float,
+    min: Float = 0,
+    max: Float = 100,
+    label: String = "",
+    color: Color = DrafterColors.teal,
+    animate: Bool = true,
+    replay: Int = 0
+  ) {
+    self.value = value
+    self.min = min
+    self.max = max
+    self.label = label
+    self.color = color
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: GaugeChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(
+      renderer: GaugeChartRenderer(value: value, min: min, max: max, label: label, color: color),
+      animate: animate,
+      duration: 0.9,
+      replay: replay
+    )
   }
 }

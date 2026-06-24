@@ -126,7 +126,7 @@ struct ContentView: View {
         )
       }
       ChartCard(title: "Pie Chart") {
-        PieChart(data: SampleData.pieData, replay: replay)
+        PieChart(slices: SampleData.pieData, replay: replay)
       }
     }
   }
@@ -135,11 +135,12 @@ struct ContentView: View {
   private func galleryCardsMid(replay: Int) -> some View {
     Group {
       ChartCard(title: "Donut Chart") {
-        DonutChart(data: SampleData.pieData, replay: replay)
+        DonutChart(slices: SampleData.pieData, replay: replay)
       }
       ChartCard(title: "Candlestick Chart") {
         CandlestickChart(
-          data: CandlestickData(candles: SampleData.candles, movingAverages: [MovingAverage(period: 3, color: SampleData.p[3])]),
+          candles: SampleData.candles,
+          movingAverages: [MovingAverage(period: 3, color: SampleData.p[3])],
           replay: replay
         )
       }
@@ -160,30 +161,30 @@ struct ContentView: View {
       }
       ChartCard(title: "Bubble Chart") {
         BubbleChart(
-          data: BubbleChartData(series: [[
+          series: [[
             BubbleData(x: 10, y: 20, size: 3, color: SampleData.p[0]),
             BubbleData(x: 30, y: 40, size: 6, color: SampleData.p[1]),
             BubbleData(x: 50, y: 25, size: 4, color: SampleData.p[2]),
             BubbleData(x: 70, y: 60, size: 8, color: SampleData.p[4]),
-          ]]),
+          ]],
           replay: replay
         )
       }
       ChartCard(title: "Gauge Chart") {
-        GaugeChart(data: GaugeData(value: 72, min: 0, max: 100, label: "Score"), replay: replay)
+        GaugeChart(value: 72, min: 0, max: 100, label: "Score", replay: replay)
       }
       ChartCard(title: "Sankey Chart") {
-        SankeyChart(data: SampleData.sankeyData, replay: replay)
+        SankeyChart(nodes: SampleData.sankeyNodes, links: SampleData.sankeyLinks, replay: replay)
       }
       ChartCard(title: "Treemap Chart") {
         TreemapChart(
-          data: TreemapData(items: [
+          items: [
             TreemapItem(label: "Alpha", value: 40, color: SampleData.p[0]),
             TreemapItem(label: "Beta", value: 25, color: SampleData.p[1]),
             TreemapItem(label: "Gamma", value: 18, color: SampleData.p[2]),
             TreemapItem(label: "Delta", value: 12, color: SampleData.p[4]),
             TreemapItem(label: "Eps", value: 8, color: SampleData.p[3]),
-          ]),
+          ],
           replay: replay
         )
       }
@@ -200,7 +201,7 @@ struct ContentView: View {
       }
       ChartCard(title: "Sunburst Chart") {
         SunburstChart(
-          data: SunburstData(roots: [
+          roots: [
             SunburstNode(label: "Web", value: 50, color: SampleData.p[0], children: [
               SunburstNode(label: "iOS", value: 30, color: SampleData.p[0]),
               SunburstNode(label: "And", value: 20, color: SampleData.p[0]),
@@ -213,7 +214,7 @@ struct ContentView: View {
               SunburstNode(label: "SQL", value: 12, color: SampleData.p[4]),
               SunburstNode(label: "KV", value: 8, color: SampleData.p[4]),
             ]),
-          ]),
+          ],
           replay: replay
         )
       }
@@ -225,31 +226,31 @@ struct ContentView: View {
     Group {
       ChartCard(title: "Funnel Chart") {
         FunnelChart(
-          data: FunnelData(stages: [
+          stages: [
             FunnelStage(label: "Visits", value: 1000, color: SampleData.p[0]),
             FunnelStage(label: "Signups", value: 620, color: SampleData.p[1]),
             FunnelStage(label: "Trials", value: 310, color: SampleData.p[2]),
             FunnelStage(label: "Paid", value: 120, color: SampleData.p[4]),
-          ]),
+          ],
           replay: replay
         )
       }
       ChartCard(title: "Bullet Chart") {
         BulletChart(
-          data: BulletData(metrics: [
+          metrics: [
             BulletMetric(label: "Revenue", value: 78, target: 85, ranges: [50, 75, 100]),
             BulletMetric(label: "Profit", value: 62, target: 60, ranges: [40, 70, 100], color: SampleData.p[1]),
-          ]),
+          ],
           replay: replay
         )
       }
       ChartCard(title: "Box Plot Chart") {
         BoxPlotChart(
-          data: BoxPlotData(groups: [
+          groups: [
             BoxGroup(label: "A", min: 5, q1: 12, median: 18, q3: 24, max: 30),
             BoxGroup(label: "B", min: 8, q1: 15, median: 22, q3: 28, max: 38, color: SampleData.p[1]),
             BoxGroup(label: "C", min: 4, q1: 10, median: 14, q3: 20, max: 26, color: SampleData.p[4]),
-          ]),
+          ],
           replay: replay
         )
       }
@@ -269,17 +270,17 @@ struct ContentView: View {
         StepLineChart(points: zip(SampleData.months, [10, 10, 25, 18, 32, 28]).map { ChartPoint($0, $1) }, replay: replay)
       }
       ChartCard(title: "Heatmap") {
-        Heatmap(data: SampleData.heatmapData, replay: replay)
+        Heatmap(contributions: SampleData.heatmapContributions, replay: replay)
       }
       ChartCard(title: "Polar Area Chart") {
         PolarAreaChart(
-          data: PolarAreaData(slices: [
+          slices: [
             PolarSlice(label: "Mon", value: 8, color: SampleData.p[0]),
             PolarSlice(label: "Tue", value: 12, color: SampleData.p[1]),
             PolarSlice(label: "Wed", value: 6, color: SampleData.p[2]),
             PolarSlice(label: "Thu", value: 15, color: SampleData.p[3]),
             PolarSlice(label: "Fri", value: 10, color: SampleData.p[4]),
-          ]),
+          ],
           replay: replay
         )
       }
@@ -350,12 +351,12 @@ private enum SampleData {
 
   // MARK: - Reusable datasets
 
-  static let pieData = PieChartData(slices: [
-    PieChartData.Slice(value: 40, color: p[0], label: "A"),
-    PieChartData.Slice(value: 25, color: p[1], label: "B"),
-    PieChartData.Slice(value: 20, color: p[2], label: "C"),
-    PieChartData.Slice(value: 15, color: p[4], label: "D"),
-  ])
+  static let pieData = [
+    PieSlice(value: 40, color: p[0], label: "A"),
+    PieSlice(value: 25, color: p[1], label: "B"),
+    PieSlice(value: 20, color: p[2], label: "C"),
+    PieSlice(value: 15, color: p[4], label: "D"),
+  ]
 
   static let candles: [Candle] = [
     Candle(label: "1", open: 20, high: 26, low: 18, close: 24),
@@ -366,24 +367,23 @@ private enum SampleData {
     Candle(label: "6", open: 27, high: 31, low: 25, close: 30),
   ]
 
-  static let sankeyData = SankeyData(
-    nodes: [
-      SankeyNode(id: "src", label: "Source", column: 0, color: p[0]),
-      SankeyNode(id: "a", label: "A", column: 1, color: p[1]),
-      SankeyNode(id: "b", label: "B", column: 1, color: p[2]),
-      SankeyNode(id: "out", label: "Out", column: 2, color: p[4]),
-    ],
-    links: [
-      SankeyLink(from: "src", to: "a", value: 30),
-      SankeyLink(from: "src", to: "b", value: 20),
-      SankeyLink(from: "a", to: "out", value: 30),
-      SankeyLink(from: "b", to: "out", value: 20),
-    ]
-  )
+  static let sankeyNodes: [SankeyNode] = [
+    SankeyNode(id: "src", label: "Source", column: 0, color: p[0]),
+    SankeyNode(id: "a", label: "A", column: 1, color: p[1]),
+    SankeyNode(id: "b", label: "B", column: 1, color: p[2]),
+    SankeyNode(id: "out", label: "Out", column: 2, color: p[4]),
+  ]
+
+  static let sankeyLinks: [SankeyLink] = [
+    SankeyLink(from: "src", to: "a", value: 30),
+    SankeyLink(from: "src", to: "b", value: 20),
+    SankeyLink(from: "a", to: "out", value: 30),
+    SankeyLink(from: "b", to: "out", value: 20),
+  ]
 
   /// GitHub-style contributions over a fixed window: deterministic dates stepped
   /// by day from a constant epoch, with a deterministic count pattern.
-  static let heatmapData: ContributionHeatmapData = {
+  static let heatmapContributions: [ContributionData] = {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
     let start = Date(timeIntervalSince1970: 1_700_000_000)
@@ -395,6 +395,6 @@ private enum SampleData {
       let count = max(0, raw - 4) // 0...11, with a sprinkling of empty days
       contributions.append(ContributionData(date: date, count: count))
     }
-    return ContributionHeatmapData(contributions: contributions)
+    return contributions
   }()
 }

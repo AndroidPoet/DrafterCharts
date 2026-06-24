@@ -41,24 +41,16 @@ public struct MovingAverage: Equatable, Sendable {
   }
 }
 
-/// Data for a `CandlestickChart`: the `candles` plus any `movingAverages`.
-public struct CandlestickData: Equatable, Sendable {
-  public var candles: [Candle]
-  public var movingAverages: [MovingAverage]
-
+/// Draws a candlestick chart into a canvas.
+public struct CandlestickChartRenderer: ChartRenderer {
+  public let candles: [Candle]
+  public let movingAverages: [MovingAverage]
   public init(candles: [Candle], movingAverages: [MovingAverage] = []) {
     self.candles = candles
     self.movingAverages = movingAverages
   }
-}
-
-/// Draws a `CandlestickData` into a canvas.
-public struct CandlestickChartRenderer: ChartRenderer {
-  public let data: CandlestickData
-  public init(data: CandlestickData) { self.data = data }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let candles = data.candles
     guard !candles.isEmpty else { return }
 
     // Plot rect: ~10% inset on every side (matches Compose 0.1 fractions), but
@@ -167,7 +159,7 @@ public struct CandlestickChartRenderer: ChartRenderer {
     // Moving-average overlays (MA5 / MA10 / MA20 ...) as smooth curves,
     // revealed left-to-right with the candles' entrance animation.
     let reveal = chartLeft + chartWidth * p
-    for ma in data.movingAverages {
+    for ma in movingAverages {
       let points = movingAveragePoints(ma, centerXFor: centerXFor, yFor: yFor)
       guard points.count >= 2 else { continue }
       var clip = context
@@ -181,12 +173,17 @@ public struct CandlestickChartRenderer: ChartRenderer {
 
     // Compact legend (MAn in each line's color), top-left inside the plot.
     var legendX = chartLeft + 4
-    for ma in data.movingAverages {
+    for ma in movingAverages {
       let label = "MA\(ma.period)"
       let text = Text(label).font(.system(size: 10)).foregroundColor(ma.color)
       context.draw(text, at: CGPoint(x: legendX, y: chartTop + 2), anchor: .topLeading)
       legendX += approxTextWidth(label, fontSize: 10) + 10
     }
+  }
+
+  public var accessibilityLabel: String { "Candlestick chart" }
+  public var accessibilityValue: String {
+    candles.isEmpty ? "No data" : "\(candles.count) candles, close \(AccessibilityFormat.range(candles.map { $0.close }))"
   }
 
   /// Builds the smoothed point list for a single moving-average line: the
@@ -196,7 +193,6 @@ public struct CandlestickChartRenderer: ChartRenderer {
     centerXFor: (Int) -> CGFloat,
     yFor: (Float) -> CGFloat
   ) -> [CGPoint] {
-    let candles = data.candles
     let count = candles.count
     guard ma.period > 0, ma.period <= count else { return [] }
     var points: [CGPoint] = []
@@ -218,17 +214,19 @@ private func approxTextWidth(_ text: String, fontSize: CGFloat) -> CGFloat {
 /// A candlestick (K-line) chart with high-low wicks, open-close bodies, and
 /// optional moving-average overlays, with an animated entrance.
 public struct CandlestickChart: View {
-  public let data: CandlestickData
+  public let candles: [Candle]
+  public let movingAverages: [MovingAverage]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: CandlestickData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(candles: [Candle], movingAverages: [MovingAverage] = [], animate: Bool = true, replay: Int = 0) {
+    self.candles = candles
+    self.movingAverages = movingAverages
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: CandlestickChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: CandlestickChartRenderer(candles: candles, movingAverages: movingAverages), animate: animate, duration: 0.9, replay: replay)
   }
 }

@@ -40,22 +40,12 @@ public struct BoxGroup: Equatable, Sendable {
   }
 }
 
-/// Data for a `BoxPlotChart`: a list of box-and-whisker `groups`.
-public struct BoxPlotData: Equatable, Sendable {
-  public var groups: [BoxGroup]
-
-  public init(groups: [BoxGroup]) {
-    self.groups = groups
-  }
-}
-
-/// Draws a `BoxPlotData` into a canvas.
+/// Draws box-and-whisker groups into a canvas.
 public struct BoxPlotChartRenderer: ChartRenderer {
-  public let data: BoxPlotData
-  public init(data: BoxPlotData) { self.data = data }
+  public let groups: [BoxGroup]
+  public init(groups: [BoxGroup]) { self.groups = groups }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let groups = data.groups
     guard !groups.isEmpty else { return }
 
     // Match the Compose layout: ~10% inset on every side, but floor the left
@@ -148,22 +138,31 @@ public struct BoxPlotChartRenderer: ChartRenderer {
       context.draw(label, at: CGPoint(x: centerX, y: chartBottom + 12), anchor: .top)
     }
   }
+
+  public var accessibilityLabel: String { "Box plot" }
+  public var accessibilityValue: String {
+    guard !groups.isEmpty else { return "No data" }
+    let summaries = groups
+      .map { "\($0.label) median \(AccessibilityFormat.number($0.median))" }
+      .joined(separator: "; ")
+    return "\(groups.count) groups: " + summaries
+  }
 }
 
 /// A box-and-whisker chart with whiskers, translucent boxes, and median lines
 /// that grow out from the median on an animated reveal.
 public struct BoxPlotChart: View {
-  public let data: BoxPlotData
+  public let groups: [BoxGroup]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: BoxPlotData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(groups: [BoxGroup], animate: Bool = true, replay: Int = 0) {
+    self.groups = groups
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: BoxPlotChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: BoxPlotChartRenderer(groups: groups), animate: animate, duration: 0.9, replay: replay)
   }
 }

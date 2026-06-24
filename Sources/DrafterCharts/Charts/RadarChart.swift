@@ -48,6 +48,13 @@ public struct RadarChartRenderer: ChartRenderer {
     }
   }
 
+  public var accessibilityLabel: String { "Radar chart" }
+  public var accessibilityValue: String {
+    guard !series.isEmpty else { return "No data" }
+    let axisCount = Self.orderedAxisLabels(series).count
+    return "\(series.count) series over \(axisCount) axes"
+  }
+
   // Concentric grid rings (5), one axis line per dimension, and axis labels.
   private func drawGridAndAxes(
     in context: inout GraphicsContext,

@@ -110,6 +110,11 @@ public struct StepLineChartRenderer: ChartRenderer {
     }
   }
 
+  public var accessibilityLabel: String { "Step line chart" }
+  public var accessibilityValue: String {
+    points.isEmpty ? "No data" : "\(points.count) points, \(AccessibilityFormat.points(points.map { ($0.label, $0.value) }))"
+  }
+
   /// Builds a stepped polyline: for each segment go horizontally at the prior
   /// y to the next x, then vertically to the next y.
   private func steppedPath(_ points: [CGPoint]) -> Path {

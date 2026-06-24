@@ -130,6 +130,11 @@ public struct LineChartRenderer: ChartRenderer {
       smooth: true
     )
   }
+
+  public var accessibilityLabel: String { "Line chart" }
+  public var accessibilityValue: String {
+    points.isEmpty ? "No data" : "\(points.count) points, \(AccessibilityFormat.points(points.map { ($0.label, $0.value) }))"
+  }
 }
 
 // MARK: - Grouped (overlaid multi-series)
@@ -185,6 +190,12 @@ public struct GroupedLineChartRenderer: ChartRenderer {
         drawVertexDot(in: &context, center: point, color: color, radius: 5)
       }
     }
+  }
+
+  public var accessibilityLabel: String { "Grouped line chart" }
+  public var accessibilityValue: String {
+    guard !series.isEmpty else { return "No data" }
+    return "\(series.count) series: " + series.map { "\($0.name.isEmpty ? "series" : $0.name) \(AccessibilityFormat.range($0.values))" }.joined(separator: "; ")
   }
 }
 
@@ -266,6 +277,12 @@ public struct StackedLineChartRenderer: ChartRenderer {
         style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
       )
     }
+  }
+
+  public var accessibilityLabel: String { "Stacked line chart" }
+  public var accessibilityValue: String {
+    guard !series.isEmpty else { return "No data" }
+    return "\(series.count) series: " + series.map { "\($0.name.isEmpty ? "series" : $0.name) \(AccessibilityFormat.range($0.values))" }.joined(separator: "; ")
   }
 }
 

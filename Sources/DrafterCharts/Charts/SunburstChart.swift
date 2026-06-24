@@ -10,7 +10,7 @@
 
 import SwiftUI
 
-/// One node in a `SunburstData` hierarchy. Root nodes form the inner ring; their
+/// One node in a `SunburstChart` hierarchy. Root nodes form the inner ring; their
 /// `children` form the outer ring, each subdividing the parent's angular span.
 public struct SunburstNode: Equatable, Sendable {
   public var label: String
@@ -26,22 +26,12 @@ public struct SunburstNode: Equatable, Sendable {
   }
 }
 
-/// Data for a `SunburstChart`: the top-level `roots` of the hierarchy.
-public struct SunburstData: Equatable, Sendable {
-  public var roots: [SunburstNode]
-
-  public init(roots: [SunburstNode]) {
-    self.roots = roots
-  }
-}
-
-/// Draws a `SunburstData` hierarchy into a canvas as two concentric rings.
+/// Draws a sunburst hierarchy into a canvas as two concentric rings.
 public struct SunburstChartRenderer: ChartRenderer {
-  public let data: SunburstData
-  public init(data: SunburstData) { self.data = data }
+  public let roots: [SunburstNode]
+  public init(roots: [SunburstNode]) { self.roots = roots }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let roots = data.roots
     guard !roots.isEmpty else { return }
 
     let layout = RadialLayout(in: size, scale: 0.92)
@@ -116,6 +106,11 @@ public struct SunburstChartRenderer: ChartRenderer {
       cursor += rootSweep
     }
   }
+
+  public var accessibilityLabel: String { "Sunburst chart" }
+  public var accessibilityValue: String {
+    roots.isEmpty ? "No data" : "\(roots.count) root segments"
+  }
 }
 
 /// Draws an annular wedge as a thick stroked arc along the ring's mid-line, plus
@@ -175,17 +170,17 @@ private func drawRingLabel(
 /// A hierarchical sunburst chart: inner ring of roots, outer ring of children,
 /// drawn clockwise from the top with an animated sweep reveal.
 public struct SunburstChart: View {
-  public let data: SunburstData
+  public let roots: [SunburstNode]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: SunburstData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(roots: [SunburstNode], animate: Bool = true, replay: Int = 0) {
+    self.roots = roots
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: SunburstChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: SunburstChartRenderer(roots: roots), animate: animate, duration: 0.9, replay: replay)
   }
 }

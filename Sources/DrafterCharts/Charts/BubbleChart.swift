@@ -26,15 +26,6 @@ public struct BubbleData: Equatable, Sendable {
   }
 }
 
-/// Data for a `BubbleChart`: one or more series, each a list of bubbles.
-public struct BubbleChartData: Equatable, Sendable {
-  public var series: [[BubbleData]]
-
-  public init(series: [[BubbleData]]) {
-    self.series = series
-  }
-}
-
 /// Axis value ranges (always anchored at 0, max rounded up to a nice number).
 private struct BubbleValueRanges {
   var xMin: Double
@@ -43,10 +34,10 @@ private struct BubbleValueRanges {
   var yMax: Double
 }
 
-/// Draws a `BubbleChartData` into a canvas with Cartesian axes and a grid.
-public struct BubbleChartDataRenderer: ChartRenderer {
-  public let data: BubbleChartData
-  public init(data: BubbleChartData) { self.data = data }
+/// Draws a bubble chart into a canvas with Cartesian axes and a grid.
+public struct BubbleChartRenderer: ChartRenderer {
+  public let series: [[BubbleData]]
+  public init(series: [[BubbleData]]) { self.series = series }
 
   // Always start at 0; round the max up to a tidy bound (matches Compose).
   private func roundToNiceNumber(_ value: Double) -> Double {
@@ -58,14 +49,14 @@ public struct BubbleChartDataRenderer: ChartRenderer {
   }
 
   private func valueRanges() -> BubbleValueRanges {
-    let all = data.series.flatMap { $0 }
+    let all = series.flatMap { $0 }
     let xMax = roundToNiceNumber(Double(all.map { $0.x }.max() ?? 0))
     let yMax = roundToNiceNumber(Double(all.map { $0.y }.max() ?? 0))
     return BubbleValueRanges(xMin: 0, xMax: xMax, yMin: 0, yMax: yMax)
   }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let all = data.series.flatMap { $0 }
+    let all = series.flatMap { $0 }
     guard !all.isEmpty else { return }
 
     // Plot origin / extent (mirrors the Compose 40 / 20 / 60 insets).
@@ -134,9 +125,9 @@ public struct BubbleChartDataRenderer: ChartRenderer {
     guard maxBubbleSize > 0 else { return }
     let scaleFactor = min(chartWidth, chartHeight) / 6
 
-    for (seriesIndex, series) in data.series.enumerated() {
-      for (bubbleIndex, bubble) in series.enumerated() {
-        let delay = Double(seriesIndex * series.count + bubbleIndex) * 0.1
+    for (seriesIndex, group) in series.enumerated() {
+      for (bubbleIndex, bubble) in group.enumerated() {
+        let delay = Double(seriesIndex * group.count + bubbleIndex) * 0.1
         let bubbleProgress = min(max(progress - delay, 0), 1)
 
         let x = originX + CGFloat(Double(bubble.x) / ranges.xMax) * chartWidth
@@ -152,21 +143,26 @@ public struct BubbleChartDataRenderer: ChartRenderer {
       }
     }
   }
+
+  public var accessibilityLabel: String { "Bubble chart" }
+  public var accessibilityValue: String {
+    "\(series.count) series, \(series.reduce(0) { $0 + $1.count }) bubbles"
+  }
 }
 
 /// A bubble (scatter) chart with magnitude-based axes and a staggered reveal.
 public struct BubbleChart: View {
-  public let data: BubbleChartData
+  public let series: [[BubbleData]]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: BubbleChartData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(series: [[BubbleData]], animate: Bool = true, replay: Int = 0) {
+    self.series = series
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: BubbleChartDataRenderer(data: data), animate: animate, duration: 2.0, replay: replay)
+    ChartCanvas(renderer: BubbleChartRenderer(series: series), animate: animate, duration: 2.0, replay: replay)
   }
 }

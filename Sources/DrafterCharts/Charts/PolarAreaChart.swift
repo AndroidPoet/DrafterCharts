@@ -25,25 +25,15 @@ public struct PolarSlice: Equatable, Sendable {
   }
 }
 
-/// Data for a `PolarAreaChart`: the ordered `slices` to lay out around the circle.
-public struct PolarAreaData: Equatable, Sendable {
-  public var slices: [PolarSlice]
-
-  public init(slices: [PolarSlice]) {
-    self.slices = slices
-  }
-}
-
-/// Draws a `PolarAreaData` into a canvas as equal-angle, value-radius wedges.
+/// Draws polar-area wedges into a canvas as equal-angle, value-radius wedges.
 public struct PolarAreaChartRenderer: ChartRenderer {
-  public let data: PolarAreaData
-  public init(data: PolarAreaData) { self.data = data }
+  public let slices: [PolarSlice]
+  public init(slices: [PolarSlice]) { self.slices = slices }
 
   /// The largest slice value, used to normalize radii.
-  public func maxValue() -> Float { data.slices.map(\.value).max() ?? 0 }
+  public func maxValue() -> Float { slices.map(\.value).max() ?? 0 }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let slices = data.slices
     guard !slices.isEmpty else { return }
 
     // Leave room for the outside labels: the demo card is short (~200pt tall),
@@ -72,6 +62,11 @@ public struct PolarAreaChartRenderer: ChartRenderer {
     }
 
     drawLabels(in: &context, center: center, maxRadius: maxRadius, slices: slices, sweepPer: sweepPer, color: theme.label)
+  }
+
+  public var accessibilityLabel: String { "Polar area chart" }
+  public var accessibilityValue: String {
+    slices.isEmpty ? "No data" : "\(slices.count) slices, \(AccessibilityFormat.points(slices.map { ($0.label, $0.value) }))"
   }
 
   // MARK: - Geometry
@@ -127,17 +122,17 @@ public struct PolarAreaChartRenderer: ChartRenderer {
 /// A polar area (rose) chart: equal-angle wedges whose radius encodes magnitude,
 /// revealed by an animated outward growth.
 public struct PolarAreaChart: View {
-  public let data: PolarAreaData
+  public let slices: [PolarSlice]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: PolarAreaData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(slices: [PolarSlice], animate: Bool = true, replay: Int = 0) {
+    self.slices = slices
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: PolarAreaChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: PolarAreaChartRenderer(slices: slices), animate: animate, duration: 0.9, replay: replay)
   }
 }

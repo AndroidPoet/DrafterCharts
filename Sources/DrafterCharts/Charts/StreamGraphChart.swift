@@ -105,6 +105,14 @@ public struct StreamGraphChartRenderer: ChartRenderer {
     drawXLabels(in: &context, theme: theme, xs: xs, baseline: chartTop + chartHeight)
   }
 
+  public var accessibilityLabel: String { "Stream graph" }
+  public var accessibilityValue: String {
+    guard !series.isEmpty else { return "No data" }
+    return "\(series.count) series: " + series.map {
+      "\($0.name.isEmpty ? "series" : $0.name) \(AccessibilityFormat.range($0.values))"
+    }.joined(separator: "; ")
+  }
+
   // MARK: - Bands
 
   /// Builds a closed band from a smooth top edge and a smooth bottom edge, fills

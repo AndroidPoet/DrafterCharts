@@ -29,22 +29,12 @@ public struct BulletMetric: Equatable, Sendable {
   }
 }
 
-/// Data for a `BulletChart`: one or more metrics stacked vertically.
-public struct BulletData: Equatable, Sendable {
-  public var metrics: [BulletMetric]
-
-  public init(metrics: [BulletMetric]) {
-    self.metrics = metrics
-  }
-}
-
-/// Draws a `BulletData` into a canvas.
+/// Draws bullet-chart metrics into a canvas.
 public struct BulletChartRenderer: ChartRenderer {
-  public let data: BulletData
-  public init(data: BulletData) { self.data = data }
+  public let metrics: [BulletMetric]
+  public init(metrics: [BulletMetric]) { self.metrics = metrics }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let metrics = data.metrics
     guard !metrics.isEmpty else { return }
 
     // Match the Compose host layout: an 80% plot inset on every side.
@@ -122,22 +112,30 @@ public struct BulletChartRenderer: ChartRenderer {
       context.draw(valueText, at: CGPoint(x: chartLeft + chartWidth, y: rowTop - 1), anchor: .bottomTrailing)
     }
   }
+
+  public var accessibilityLabel: String { "Bullet chart" }
+  public var accessibilityValue: String {
+    guard !metrics.isEmpty else { return "No data" }
+    return metrics
+      .map { "\($0.label) \(AccessibilityFormat.number($0.value)) of target \(AccessibilityFormat.number($0.target))" }
+      .joined(separator: "; ")
+  }
 }
 
 /// A bullet chart: stacked KPI tracks with qualitative range bands, an animated
 /// value bar, and a target marker per metric.
 public struct BulletChart: View {
-  public let data: BulletData
+  public let metrics: [BulletMetric]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: BulletData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(metrics: [BulletMetric], animate: Bool = true, replay: Int = 0) {
+    self.metrics = metrics
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: BulletChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: BulletChartRenderer(metrics: metrics), animate: animate, duration: 0.9, replay: replay)
   }
 }

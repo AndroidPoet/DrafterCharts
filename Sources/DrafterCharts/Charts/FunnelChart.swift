@@ -24,22 +24,13 @@ public struct FunnelStage: Equatable, Sendable {
   }
 }
 
-/// Data for a `FunnelChart`: an ordered list of `stages`, top to bottom.
-public struct FunnelData: Equatable, Sendable {
-  public var stages: [FunnelStage]
-
-  public init(stages: [FunnelStage]) {
-    self.stages = stages
-  }
-}
-
-/// Draws a `FunnelData` as stacked, center-converging trapezoids into a canvas.
+/// Draws an ordered list of `FunnelStage`s as stacked, center-converging
+/// trapezoids into a canvas.
 public struct FunnelChartRenderer: ChartRenderer {
-  public let data: FunnelData
-  public init(data: FunnelData) { self.data = data }
+  public let stages: [FunnelStage]
+  public init(stages: [FunnelStage]) { self.stages = stages }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let stages = data.stages
     guard !stages.isEmpty else { return }
 
     // Matches Compose FunnelChart host insets (0.1 / 0.08 / 0.8 / 0.84).
@@ -124,21 +115,29 @@ public struct FunnelChartRenderer: ChartRenderer {
       }
     }
   }
+
+  /// VoiceOver: names this as a funnel chart.
+  public var accessibilityLabel: String { "Funnel chart" }
+
+  /// VoiceOver: the stage count and each stage's label/value.
+  public var accessibilityValue: String {
+    stages.isEmpty ? "No data" : "\(stages.count) stages, \(AccessibilityFormat.points(stages.map { ($0.label, $0.value) }))"
+  }
 }
 
 /// A stacked, center-converging funnel chart with an animated outward reveal.
 public struct FunnelChart: View {
-  public let data: FunnelData
+  public let stages: [FunnelStage]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: FunnelData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(stages: [FunnelStage], animate: Bool = true, replay: Int = 0) {
+    self.stages = stages
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: FunnelChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: FunnelChartRenderer(stages: stages), animate: animate, duration: 0.9, replay: replay)
   }
 }

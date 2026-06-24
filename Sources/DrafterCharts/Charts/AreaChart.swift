@@ -84,6 +84,11 @@ public struct AreaChartRenderer: ChartRenderer {
       context.draw(text, at: CGPoint(x: pixelPoints[index].x, y: bounds.bottom + 13), anchor: .center)
     }
   }
+
+  public var accessibilityLabel: String { "Area chart" }
+  public var accessibilityValue: String {
+    points.isEmpty ? "No data" : "\(points.count) points, \(AccessibilityFormat.points(points.map { ($0.label, $0.value) }))"
+  }
 }
 
 /// A smooth area chart with a soft gradient fill and an animated reveal.

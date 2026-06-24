@@ -49,22 +49,14 @@ public struct SankeyLink: Equatable, Sendable {
   }
 }
 
-/// The full dataset for a Sankey diagram: a set of `nodes` and the `links`
-/// between them.
-public struct SankeyData: Equatable, Sendable {
-  public var nodes: [SankeyNode]
-  public var links: [SankeyLink]
-
+/// Draws a Sankey flow diagram into a canvas.
+public struct SankeyChartRenderer: ChartRenderer {
+  public let nodes: [SankeyNode]
+  public let links: [SankeyLink]
   public init(nodes: [SankeyNode], links: [SankeyLink]) {
     self.nodes = nodes
     self.links = links
   }
-}
-
-/// Draws a `SankeyData` flow diagram into a canvas.
-public struct SankeyChartRenderer: ChartRenderer {
-  public let data: SankeyData
-  public init(data: SankeyData) { self.data = data }
 
   /// A node positioned in pixel space, ready to draw.
   private struct PlacedNode {
@@ -78,7 +70,6 @@ public struct SankeyChartRenderer: ChartRenderer {
   }
 
   public func draw(in context: inout GraphicsContext, size: CGSize, theme: DrafterThemeColors, progress: Double) {
-    let nodes = data.nodes
     guard !nodes.isEmpty else { return }
 
     let prog = CGFloat(min(max(progress, 0), 1))
@@ -98,7 +89,7 @@ public struct SankeyChartRenderer: ChartRenderer {
     // Per-node throughput = max(total inflow, total outflow).
     var inflow: [String: Float] = [:]
     var outflow: [String: Float] = [:]
-    for link in data.links where nodeById[link.from] != nil && nodeById[link.to] != nil {
+    for link in links where nodeById[link.from] != nil && nodeById[link.to] != nil {
       outflow[link.from, default: 0] += link.value
       inflow[link.to, default: 0] += link.value
     }
@@ -164,7 +155,7 @@ public struct SankeyChartRenderer: ChartRenderer {
     let revealRight = chartLeft + chartWidth * prog
 
     // Draw the bands first (behind node bars).
-    for link in data.links {
+    for link in links {
       guard let from = placed[link.from], let to = placed[link.to] else { continue }
 
       let fromTotal = max(throughput(from.node.id), 0.0001)
@@ -225,6 +216,9 @@ public struct SankeyChartRenderer: ChartRenderer {
       )
     }
   }
+
+  public var accessibilityLabel: String { "Sankey diagram" }
+  public var accessibilityValue: String { "\(nodes.count) nodes, \(links.count) flows" }
 
   /// Draws one flow band as a filled cubic S-curve with a horizontal from->to
   /// gradient, revealed by clipping to the left of `revealRight`.
@@ -309,17 +303,19 @@ public struct SankeyChartRenderer: ChartRenderer {
 /// A Sankey flow diagram with gradient flow bands and an animated left-to-right
 /// reveal.
 public struct SankeyChart: View {
-  public let data: SankeyData
+  public let nodes: [SankeyNode]
+  public let links: [SankeyLink]
   public var animate: Bool
   public var replay: Int
 
-  public init(data: SankeyData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(nodes: [SankeyNode], links: [SankeyLink], animate: Bool = true, replay: Int = 0) {
+    self.nodes = nodes
+    self.links = links
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: SankeyChartRenderer(data: data), animate: animate, duration: 0.9, replay: replay)
+    ChartCanvas(renderer: SankeyChartRenderer(nodes: nodes, links: links), animate: animate, duration: 0.9, replay: replay)
   }
 }

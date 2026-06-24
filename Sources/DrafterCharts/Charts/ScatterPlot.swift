@@ -79,6 +79,11 @@ public struct ScatterPlotRenderer: ChartRenderer {
     }
   }
 
+  public var accessibilityLabel: String { "Scatter plot" }
+  public var accessibilityValue: String {
+    points.isEmpty ? "No data" : "\(points.count) points"
+  }
+
   /// Evenly spaced tick values from 0...max (inclusive) for axis labels.
   private func tickValues(max: Float, count: Int) -> [Float] {
     guard max > 0, count > 0 else { return [] }

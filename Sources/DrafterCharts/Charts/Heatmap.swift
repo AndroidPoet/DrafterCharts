@@ -22,12 +22,18 @@ public struct ContributionData: Equatable, Sendable {
   }
 }
 
-/// Data for a `Heatmap`: the per-day contributions plus the base (filled) color
-/// and the color used for empty cells.
-public struct ContributionHeatmapData: Equatable, Sendable {
-  public var contributions: [ContributionData]
-  public var baseColor: Color
-  public var backgroundSquareColor: Color
+/// Lays out and draws contributions as a GitHub-style contribution calendar.
+public struct HeatmapRenderer: ChartRenderer {
+  public let contributions: [ContributionData]
+  public let baseColor: Color
+  public let backgroundSquareColor: Color
+
+  /// Cell edge length in points (~8pt, like the Compose `8.dp`).
+  private let cellSize: CGFloat = 8
+  /// Gap between adjacent cells (~2pt, like the Compose `2.dp`).
+  private let cellPadding: CGFloat = 2
+  /// Number of week columns (a full year ≈ 53 weeks).
+  private let weeks = 53
 
   public init(
     contributions: [ContributionData],
@@ -38,31 +44,17 @@ public struct ContributionHeatmapData: Equatable, Sendable {
     self.baseColor = baseColor
     self.backgroundSquareColor = backgroundSquareColor
   }
-}
-
-/// Lays out and draws a `ContributionHeatmapData` as a contribution calendar.
-public struct HeatmapDataRenderer: ChartRenderer {
-  public let data: ContributionHeatmapData
-
-  /// Cell edge length in points (~8pt, like the Compose `8.dp`).
-  private let cellSize: CGFloat = 8
-  /// Gap between adjacent cells (~2pt, like the Compose `2.dp`).
-  private let cellPadding: CGFloat = 2
-  /// Number of week columns (a full year ≈ 53 weeks).
-  private let weeks = 53
-
-  public init(data: ContributionHeatmapData) { self.data = data }
 
   /// Buckets a day's count into a GitHub-style intensity color. Empty days use a
   /// faint square (light gray on light themes, the configured dark square on dark
   /// themes); non-empty days fade the base color through four alpha steps.
   private func contributionColor(count: Int, theme: DrafterThemeColors) -> Color {
     switch count {
-    case ..<1: return theme.isDark ? data.backgroundSquareColor : Color(hex: 0xEBEDF0)
-    case 1...3: return data.baseColor.opacity(0.35)
-    case 4...6: return data.baseColor.opacity(0.6)
-    case 7...9: return data.baseColor.opacity(0.8)
-    default: return data.baseColor
+    case ..<1: return theme.isDark ? backgroundSquareColor : Color(hex: 0xEBEDF0)
+    case 1...3: return baseColor.opacity(0.35)
+    case 4...6: return baseColor.opacity(0.6)
+    case 7...9: return baseColor.opacity(0.8)
+    default: return baseColor
     }
   }
 
@@ -73,7 +65,7 @@ public struct HeatmapDataRenderer: ChartRenderer {
     // to today when empty), so supplied contributions always land in-range.
     var countsByDay: [Date: Int] = [:]
     var latest = calendar.startOfDay(for: Date())
-    for contribution in data.contributions {
+    for contribution in contributions {
       let day = calendar.startOfDay(for: contribution.date)
       countsByDay[day, default: 0] += contribution.count
     }
@@ -115,21 +107,45 @@ public struct HeatmapDataRenderer: ChartRenderer {
       }
     }
   }
+
+  public var accessibilityLabel: String { "Contribution heatmap" }
+  public var accessibilityValue: String {
+    "\(contributions.count) days, \(contributions.reduce(0) { $0 + $1.count }) total contributions"
+  }
 }
 
 /// A GitHub-style contribution heatmap with an animated fade-in reveal.
 public struct Heatmap: View {
-  public let data: ContributionHeatmapData
+  public let contributions: [ContributionData]
+  public var baseColor: Color
+  public var backgroundSquareColor: Color
   public var animate: Bool
   public var replay: Int
 
-  public init(data: ContributionHeatmapData, animate: Bool = true, replay: Int = 0) {
-    self.data = data
+  public init(
+    contributions: [ContributionData],
+    baseColor: Color = Color(hex: 0x40C463),
+    backgroundSquareColor: Color = Color(hex: 0x2D333B),
+    animate: Bool = true,
+    replay: Int = 0
+  ) {
+    self.contributions = contributions
+    self.baseColor = baseColor
+    self.backgroundSquareColor = backgroundSquareColor
     self.animate = animate
     self.replay = replay
   }
 
   public var body: some View {
-    ChartCanvas(renderer: HeatmapDataRenderer(data: data), animate: animate, duration: 1.0, replay: replay)
+    ChartCanvas(
+      renderer: HeatmapRenderer(
+        contributions: contributions,
+        baseColor: baseColor,
+        backgroundSquareColor: backgroundSquareColor
+      ),
+      animate: animate,
+      duration: 1.0,
+      replay: replay
+    )
   }
 }
