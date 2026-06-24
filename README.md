@@ -17,7 +17,9 @@
 
 <div align="center">
 
-https://github.com/AndroidPoet/DrafterCharts/raw/main/Art/demo.mp4
+![DrafterCharts demo](Art/demo.gif)
+
+<sub><a href="https://github.com/AndroidPoet/DrafterCharts/raw/main/Art/demo.mp4">▶ Watch the full-resolution video</a></sub>
 
 </div>
 
