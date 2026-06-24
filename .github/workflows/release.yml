@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify release build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build (release)
+        run: swift build -c release -v
+
+      - name: Test
+        run: swift test -v
+
+      # DrafterCharts is distributed through Swift Package Manager, which resolves
+      # packages directly from the tagged Git revision — there is no artifact to
+      # upload. This job exists to guarantee that every published tag builds and
+      # tests cleanly before consumers can resolve it.
+      - name: Confirm package resolves
+        run: swift package resolve

@@ -174,7 +174,7 @@ public struct GroupedLineChartRenderer: ChartRenderer {
     let span = (xPositions.last ?? 0) - (xPositions.first ?? 0)
     let revealRight = (xPositions.first ?? 0) + span * clamped
 
-    for (itemIndex, _) in data.itemNames.enumerated() {
+    for itemIndex in data.itemNames.indices {
       let color = itemIndex < data.colors.count ? data.colors[itemIndex] : .gray
       let points: [CGPoint] = (0..<numPoints).map { index in
         let value = itemIndex < data.groupedValues[index].count ? data.groupedValues[index][itemIndex] : 0

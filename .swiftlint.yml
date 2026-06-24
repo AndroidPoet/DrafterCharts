@@ -1,0 +1,58 @@
+included:
+  - Sources
+  - Tests
+
+excluded:
+  - .build
+  - .swiftpm
+
+# DrafterCharts uses a 2-space indent and slightly wider lines than the default,
+# because chart renderers carry long, descriptive draw calls.
+indentation: 2
+
+line_length:
+  warning: 160
+  error: 220
+  ignores_comments: true
+  ignores_urls: true
+
+type_body_length:
+  warning: 400
+  error: 600
+
+file_length:
+  warning: 600
+  error: 1000
+  ignore_comment_only_lines: true
+
+function_body_length:
+  warning: 120
+  error: 200
+
+cyclomatic_complexity:
+  warning: 20
+  error: 30
+
+type_name:
+  min_length: 3
+  max_length: 50
+
+identifier_name:
+  min_length: 1
+  max_length: 50
+  allowed_symbols: ["_"]
+
+opt_in_rules:
+  - closure_spacing
+  - operator_usage_whitespace
+  - redundant_nil_coalescing
+  - vertical_whitespace_closing_braces
+
+disabled_rules:
+  - todo
+  - trailing_comma
+  # Chart renderers legitimately take many style parameters (context, size,
+  # theme, progress, colors, widths …), so the parameter-count limit doesn't fit.
+  - function_parameter_count
+
+reporter: "xcode"

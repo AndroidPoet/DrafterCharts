@@ -1,6 +1,7 @@
 <h1 align="center">DrafterCharts</h1>
 
 <p align="center">
+  <a href="https://github.com/AndroidPoet/DrafterCharts/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/AndroidPoet/DrafterCharts/actions/workflows/ci.yml/badge.svg"/></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"/></a>
   <a href="https://swift.org"><img alt="Swift 5.9" src="https://img.shields.io/badge/Swift-5.9-orange.svg"/></a>
   <img alt="Platforms" src="https://img.shields.io/badge/Platforms-iOS%2016%2B%20%7C%20macOS%2013%2B-lightgrey.svg"/>
