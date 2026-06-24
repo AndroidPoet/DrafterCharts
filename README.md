@@ -72,6 +72,17 @@ AreaChart(data: areaData, replay: replayKey)  // bump replayKey to re-run
 
 Size charts like any SwiftUI view with `.frame(...)`, and set the palette/light-dark with `.drafterTheme(...)`.
 
+For the simplest single-series charts there are **values-first** convenience initializers, so trivial cases can skip the data struct:
+
+```swift
+LineChart(values: [40, 65, 50, 80, 70, 95])
+AreaChart(values: [12, 18, 9, 24, 20, 30], color: .teal)
+SimpleBarChart(values: [24, 38, 30, 46])
+StepLineChart(values: [10, 25, 18, 32])
+```
+
+The full `init(data:)` form remains the primary API for labels, multi-series, and per-element colors.
+
 ## Table of Contents
 
 1. [Bar Charts](#bar-charts) — [Simple](#simple-bar-chart) · [Grouped](#grouped-bar-chart) · [Stacked](#stacked-bar-chart)
