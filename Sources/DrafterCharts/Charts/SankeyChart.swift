@@ -194,7 +194,8 @@ public struct SankeyChartRenderer: ChartRenderer {
         endBottom: endBottom,
         fromColor: from.node.color,
         toColor: to.node.color,
-        revealRight: revealRight
+        revealRight: revealRight,
+        canvasHeight: size.height
       )
     }
 
@@ -237,7 +238,8 @@ public struct SankeyChartRenderer: ChartRenderer {
     endBottom: CGFloat,
     fromColor: Color,
     toColor: Color,
-    revealRight: CGFloat
+    revealRight: CGFloat,
+    canvasHeight: CGFloat
   ) {
     let midX = (startX + endX) / 2
     var path = Path()
@@ -258,7 +260,7 @@ public struct SankeyChartRenderer: ChartRenderer {
     let gradient = Gradient(colors: [fromColor.opacity(0.5), toColor.opacity(0.5)])
 
     var clip = context
-    clip.clip(to: Path(CGRect(x: 0, y: 0, width: revealRight, height: .greatestFiniteMagnitude)))
+    clip.clip(to: Path(CGRect(x: 0, y: 0, width: revealRight, height: canvasHeight)))
     clip.fill(
       path,
       with: .linearGradient(
@@ -290,10 +292,15 @@ public struct SankeyChartRenderer: ChartRenderer {
     // At small sizes the 8% side inset is too narrow to hold edge-column labels,
     // so anchoring them outside the bar (.trailing left of the first node /
     // .leading right of the last node) pushes the text past the canvas and clips
-    // it. Draw every label centered above its bar instead, clamped horizontally
-    // to the canvas and vertically below the chart top so a near-full-height bar
-    // never clips the label off the top edge.
-    let cx = min(max(x + width / 2, 2), canvasWidth - 2)
+    // it. Draw every label centered above its bar instead, and clamp the center
+    // by the resolved text's half-width so the WHOLE label stays on-canvas (not
+    // just its center), then keep it below the chart top so a near-full-height
+    // bar never clips the label off the top edge.
+    let resolved = context.resolve(text)
+    let half = resolved.measure(in: CGSize(width: canvasWidth, height: .infinity)).width / 2
+    let lower = min(half + 2, canvasWidth / 2)
+    let upper = max(canvasWidth - half - 2, canvasWidth / 2)
+    let cx = min(max(x + width / 2, lower), upper)
     let ly = max(barTop - 4, chartTop + 4)
     context.draw(text, at: CGPoint(x: cx, y: ly), anchor: .bottom)
   }
